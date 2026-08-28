@@ -70,7 +70,7 @@
       "type": "relation",
       "relation": "oneToMany",
       "target": "api::course.course",
-      "mappedBy": "users_permissions_user"
+      "mappedBy": "instructor"
     },
     "enrollments": {
       "type": "relation",
