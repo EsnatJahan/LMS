@@ -20,19 +20,44 @@ export default factories.createCoreController('api::question.question', ({ strap
       return ctx.badRequest('A quiz ID is required to add a question.');
     }
 
-    // If Instructor, verify ownership of the course containing the quiz
-    if (roleName === 'Instructor') {
-      const quiz: any = await strapi.entityService.findOne('api::quiz.quiz', data.quiz, {
-        populate: { course: { populate: ['instructor'] } },
-      });
+    // Find quiz by id or documentId
+    const quiz: any = await strapi.db.query('api::quiz.quiz').findOne({
+      where: {
+        $or: [
+          { id: isNaN(Number(data.quiz)) ? -1 : Number(data.quiz) },
+          { documentId: data.quiz },
+        ],
+      },
+      populate: { course: { populate: ['instructor'] } },
+    });
 
-      if (!quiz) return ctx.notFound('Quiz not found.');
+    if (!quiz) return ctx.notFound('Quiz not found.');
+
+    // If Instructor, verify ownership of course containing the quiz
+    if (roleName === 'Instructor') {
       if (quiz.course?.instructor?.id !== user.id) {
         return ctx.unauthorized('You can only add questions to quizzes on your own courses.');
       }
     }
 
-    return super.create(ctx);
+    try {
+      const created = await strapi.entityService.create('api::question.question', {
+        data: {
+          title: data.title,
+          options: data.options,
+          correctAnswer: data.correctAnswer,
+          quiz: quiz.id,
+          publishedAt: new Date(),
+        },
+        populate: ['quiz'],
+      });
+
+      const sanitizedEntity = await (this as any).sanitizeOutput(created, ctx);
+      return (this as any).transformResponse(sanitizedEntity);
+    } catch (error: any) {
+      console.error('Question Create Error:', error);
+      return ctx.internalServerError('Failed to create quiz question');
+    }
   },
 
   async update(ctx) {
@@ -47,7 +72,13 @@ export default factories.createCoreController('api::question.question', ({ strap
 
     if (roleName === 'Student' || roleName === 'Authenticated') return ctx.forbidden();
 
-    const question: any = await strapi.entityService.findOne('api::question.question', questionId, {
+    const question: any = await strapi.db.query('api::question.question').findOne({
+      where: {
+        $or: [
+          { id: isNaN(Number(questionId)) ? -1 : Number(questionId) },
+          { documentId: questionId },
+        ],
+      },
       populate: { quiz: { populate: { course: { populate: ['instructor'] } } } },
     });
 
@@ -72,7 +103,13 @@ export default factories.createCoreController('api::question.question', ({ strap
 
     if (roleName === 'Student' || roleName === 'Authenticated') return ctx.forbidden();
 
-    const question: any = await strapi.entityService.findOne('api::question.question', questionId, {
+    const question: any = await strapi.db.query('api::question.question').findOne({
+      where: {
+        $or: [
+          { id: isNaN(Number(questionId)) ? -1 : Number(questionId) },
+          { documentId: questionId },
+        ],
+      },
       populate: { quiz: { populate: { course: { populate: ['instructor'] } } } },
     });
 
@@ -82,6 +119,13 @@ export default factories.createCoreController('api::question.question', ({ strap
       return ctx.unauthorized('You can only delete questions from your own courses.');
     }
 
-    return super.delete(ctx);
+    try {
+      await strapi.db.query('api::question.question').deleteMany({
+        where: { documentId: question.documentId },
+      });
+      return ctx.send({ message: 'Question deleted successfully' });
+    } catch (error: any) {
+      return ctx.internalServerError('Failed to delete question');
+    }
   },
 }));

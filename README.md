@@ -2,7 +2,7 @@
 
 A full-stack, enterprise-grade Learning Management System built with **Next.js** (Frontend) and **Strapi v5** (Backend / Headless CMS).
 
-This project implements strict 4-role access control, course & curriculum management with rich text and video support, auto-graded MCQ quizzes, accurate per-student progress tracking, an administrative control center with real-time role assignment, and an editorial blog publishing engine.
+This project implements strict 4-role access control, course & curriculum management with rich text and video support, auto-graded MCQ quizzes, accurate per-student progress tracking, an administrative control center with real-time role assignment, an editorial blog publishing engine, and role-tailored dashboards.
 
 ---
 
@@ -14,10 +14,11 @@ The system strictly enforces permissions on the backend API controllers and the 
 |---|:---:|:---:|:---:|:---:|
 | **Manage Users & Assign Roles** | ✅ | ❌ | ❌ | ❌ |
 | **Create / Edit / Delete Any Course** | ✅ | ✅ | Own Courses Only | ❌ |
-| **Add / Edit / Delete Lessons** | ✅ | ✅ | Own Courses Only | ❌ |
+| **Add / Edit / Delete Lessons / Lectures** | ✅ | ✅ | Own Courses Only | ❌ |
 | **Create / Edit / Delete Quizzes** | ✅ | ✅ | Own Courses Only | ❌ |
 | **View Student Progress** | ✅ | ✅ | Own Courses Only | Own Progress Only |
 | **Write / Publish / Manage Blog Posts** | ✅ | ✅ | ❌ | ❌ |
+| **Role-Tailored Dashboard** | Platform Oversight | Content Management Hub | Instructor Portal | Enrolled Courses & Grades |
 | **Enroll in Courses** | ❌ | ❌ | ❌ | ✅ |
 | **Take Quizzes & Auto-Grading** | ❌ | ❌ | ❌ | ✅ |
 
@@ -30,8 +31,8 @@ For testing and video walkthrough evaluation, use any of the pre-configured cred
 | Role | Email / Identifier | Password | Key Permissions & Flows to Test |
 |---|---|---|---|
 | **👑 Admin** | `admin@test.com` (or `lmsadmin@test.com`) | `password123` | Platform Analytics, User Role Management (`/admin`), Full control over courses and blogs |
-| **✍️ Content Manager** | `content@test.com` | `password123` | Platform-wide course & lesson editor, Blog draft & publish workflows (`/manage/blogs`) |
-| **👨‍🏫 Instructor** | `instructor@test.com` | `password123` | Create own courses, add video lessons & MCQ quizzes, view enrolled students' progress |
+| **✍️ Content Manager** | `content@test.com` | `password123` | Platform-wide course & lesson editor, Blog draft & publish workflows (`/manage/blogs`), Content Overview Dashboard |
+| **👨‍🏫 Instructor** | `instructor@test.com` | `password123` | Create own courses, add video lessons & MCQ quizzes, view enrolled students' completion rate on Instructor Dashboard |
 | **🎓 Student** | `student@test.com` | `password123` | Browse catalog, enroll in courses, sequential video lessons, mark progress, take auto-graded quizzes |
 
 > 💡 *Tip: On the [Login Page](/login), 1-click quick login buttons are available to easily test each role.*
@@ -40,17 +41,17 @@ For testing and video walkthrough evaluation, use any of the pre-configured cred
 
 ## ✨ Features Implemented
 
-### 1. Authentication & Role-Based Access
-- **Custom Registration with Role Selection**: Users can register as `Student`, `Instructor`, or `Content Manager`.
-- **JWT-Protected API Routes**: Role permissions are strictly verified server-side inside Strapi controllers.
-- **Dynamic Role Navigation**: Responsive Navbar displays the active user's role badge and contextual links.
+### 1. Role-Tailored Dashboards (`/dashboard`)
+- **Student Dashboard**: Displays enrolled courses with live completion percentage bars and past MCQ quiz results history.
+- **Content Manager Dashboard**: Shows platform-wide metrics (total courses, lessons, quizzes, draft/published blogs), direct course curriculum management shortcuts, and blog editorial tables.
+- **Instructor Dashboard**: Shows authored courses, total lectures taught, enrolled students with real-time completion rates, and quick shortcuts to create courses & lectures.
+- **Admin Dashboard**: Summary with direct access to the dedicated `/admin` control center.
 
-### 2. Course & Curriculum Management (Admin / Content Manager / Instructor)
-- **Course CRUD**: Create, edit, and delete courses per the permission matrix.
-- **Lesson Builder**: Add structured lessons with rich text content, embedded video support (YouTube / MP4), and sequence ordering.
-- **Course & Student Progress Viewer**: Instructors and Admins can view enrolled students and their real-time completion percentages.
+### 2. Course & Curriculum Management
+- **Content Manager & Admin**: Full platform-wide CRUD on all courses, lessons, and quizzes.
+- **Instructor**: Dedicated ownership enforcement—instructors can create courses, add video/text lectures, attach MCQ quizzes, and edit/delete their own courses only.
 
-### 3. Student Learning & Progress Tracking (Student)
+### 3. Student Learning & Persistent Progress Tracking
 - **1-Click Free Enrollment**: Students can enroll in any available course.
 - **Sequential Lesson Viewing**: Navigate smoothly between lessons with `← Previous` and `Next →` buttons.
 - **Persistent Progress Tracking**: Visual progress bar (`X of Y lessons completed (Z%)`) that persists accurately across page refreshes and browser sessions.
@@ -119,21 +120,3 @@ npm run dev
 ```
 
 The Next.js frontend will start at `http://localhost:3000`.
-
----
-
-## 🎥 Video Walkthrough Guide
-
-When recording your 10-minute video walkthrough, cover the following structure:
-1. **Live Demo Across All 4 Roles**:
-   - **Student Flow**: Login $\rightarrow$ Browse Courses $\rightarrow$ Enroll $\rightarrow$ Watch Video Lesson $\rightarrow$ Mark Complete (show % update) $\rightarrow$ Take Quiz $\rightarrow$ Immediate Score.
-   - **Instructor Flow**: Login $\rightarrow$ Course Hub $\rightarrow$ Create Course $\rightarrow$ Add Lesson & MCQ Quiz $\rightarrow$ Check Enrolled Students.
-   - **Content Manager Flow**: Login $\rightarrow$ Edit Course $\rightarrow$ Write Blog Article in Draft $\rightarrow$ Publish Article $\rightarrow$ Verify on Public Blog.
-   - **Admin Flow**: Login $\rightarrow$ Admin Panel $\rightarrow$ Platform Stats $\rightarrow$ Change a User's Role in real time.
-2. **Data Flow Explanation**:
-   - Explain how `POST /api/quiz-results/submit` or `POST /api/lesson-progresses` moves from frontend React state through bearer token headers to Strapi controller and SQLite.
-3. **Role-Based Security**:
-   - Demonstrate how backend controllers reject unauthorized role actions with HTTP 403 Forbidden even if someone invokes the API directly.
-4. **Auto-Grading & Progress Logic**:
-   - Show how the score computation and progress percentages are computed and persisted in code.
-

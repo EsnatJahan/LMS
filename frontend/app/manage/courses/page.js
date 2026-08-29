@@ -79,25 +79,61 @@ export default function ManageCoursesPage() {
     const token = jwt || localStorage.getItem("jwt");
     const roleName = user?.role?.name || currentUser?.role?.name;
 
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/courses?populate[instructor]=*&populate[lessons]=*&populate[quizzes][populate]=questions&populate[enrollments]=*`,
-      {
+    const [coursesRes, quizzesRes] = await Promise.all([
+      fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/courses?populate=*`, {
         headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+      }),
+      fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/quizzes?populate=*`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+    ]);
 
-    const data = await res.json();
-    if (res.ok) {
-      let courseList = data.data || [];
-      // If instructor, show only own courses by default
+    const coursesData = await coursesRes.json();
+    const quizzesData = await quizzesRes.json();
+
+    if (coursesRes.ok) {
+      let courseList = coursesData.data || [];
+      const allQuizzesList = quizzesData?.data || [];
+
+      // Attach complete quizzes with questions to each course
+      courseList = courseList.map((course) => {
+        const matchingQuizzes = allQuizzesList.filter((q) => {
+          const c = q.course;
+          return (
+            c &&
+            (c.id === course.id ||
+              c.documentId === course.documentId ||
+              c.title === course.title)
+          );
+        });
+        return {
+          ...course,
+          quizzes: matchingQuizzes,
+        };
+      });
+
+      // If instructor, filter to own courses or unassigned courses (with fallback)
       if (roleName === "Instructor") {
-        courseList = courseList.filter(
-          (c) => c.instructor?.id === user?.id || c.instructor?.id === currentUser?.id
+        const uId = user?.id || currentUser?.id;
+        const uDocId = user?.documentId || currentUser?.documentId;
+        const uName = user?.username || currentUser?.username;
+
+        const myFiltered = courseList.filter(
+          (c) =>
+            !c.instructor ||
+            c.instructor?.id === uId ||
+            c.instructor?.documentId === uDocId ||
+            c.instructor?.username === uName
         );
+
+        courseList = myFiltered.length > 0 ? myFiltered : courseList;
       }
+
       setCourses(courseList);
       if (selectedCourse) {
-        const updated = courseList.find((c) => c.id === selectedCourse.id);
+        const updated = courseList.find(
+          (c) => c.id === selectedCourse.id || c.documentId === selectedCourse.documentId
+        );
         if (updated) setSelectedCourse(updated);
       }
     }
@@ -140,20 +176,25 @@ export default function ManageCoursesPage() {
   }
 
   // Delete Course
-  async function handleDeleteCourse(courseId) {
-    if (!confirm("Are you sure you want to delete this course?")) return;
+  async function handleDeleteCourse(courseIdentifier) {
+    if (!confirm("Are you sure you want to delete this course and all its lessons/quizzes? This action cannot be undone.")) return;
 
     try {
       const jwt = localStorage.getItem("jwt");
-      const res = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/courses/${courseId}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/courses/${courseIdentifier}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${jwt}` },
       });
 
-      if (!res.ok) throw new Error("Failed to delete course");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || "Failed to delete course");
+      }
 
       alert("Course deleted successfully!");
-      if (selectedCourse?.id === courseId) setSelectedCourse(null);
+      if (selectedCourse?.id === courseIdentifier || selectedCourse?.documentId === courseIdentifier) {
+        setSelectedCourse(null);
+      }
       await fetchCourses();
     } catch (err) {
       alert(err.message);
@@ -258,7 +299,7 @@ export default function ManageCoursesPage() {
   }
 
   // Add Question to Quiz
-  async function handleAddQuestion(e, quizId) {
+  async function handleAddQuestion(e, quiz) {
     e.preventDefault();
     setSavingQuestion(true);
 
@@ -275,6 +316,8 @@ export default function ManageCoursesPage() {
       return;
     }
 
+    const quizIdentifier = quiz?.documentId || quiz?.id || quiz;
+
     try {
       const jwt = localStorage.getItem("jwt");
       const res = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/questions`, {
@@ -288,7 +331,7 @@ export default function ManageCoursesPage() {
             title: questionTitle,
             options,
             correctAnswer,
-            quiz: quizId,
+            quiz: quizIdentifier,
           },
         }),
       });
@@ -311,27 +354,58 @@ export default function ManageCoursesPage() {
     }
   }
 
+  // Delete Question from Quiz
+  async function handleDeleteQuestion(questionId) {
+    if (!confirm("Are you sure you want to delete this question?")) return;
+
+    try {
+      const jwt = localStorage.getItem("jwt");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/questions/${questionId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.error?.message || "Failed to delete question");
+      }
+
+      alert("Question deleted successfully!");
+      await fetchCourses();
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
   // Load Enrolled Students with Progress
   async function loadCourseStudents(course) {
     setLoadingStudents(true);
     try {
       const jwt = localStorage.getItem("jwt");
       
-      // Fetch enrollments for this course with users
+      // Fetch enrollments with populate=*
       const enrollRes = await fetch(
-        `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/enrollments?filters[course][id][$eq]=${course.id}&populate[users_permissions_user]=*`,
+        `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/enrollments?populate=*`,
         { headers: { Authorization: `Bearer ${jwt}` } }
       );
       const enrollData = await enrollRes.json();
-      const enrollments = enrollData?.data || [];
+      const allEnrollments = enrollData?.data || [];
+      const enrollments = allEnrollments.filter((e) => {
+        const c = e.course;
+        return c && (c.id === course.id || c.documentId === course.documentId || c.title === course.title);
+      });
 
-      // Fetch progresses for this course
+      // Fetch progresses with populate=*
       const progRes = await fetch(
-        `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/lesson-progresses?filters[course][id][$eq]=${course.id}&populate[users_permissions_user]=*&populate[lesson]=*`,
+        `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/lesson-progresses?populate=*`,
         { headers: { Authorization: `Bearer ${jwt}` } }
       );
       const progData = await progRes.json();
-      const progresses = progData?.data || [];
+      const allProgresses = progData?.data || [];
+      const progresses = allProgresses.filter((p) => {
+        const c = p.course;
+        return c && (c.id === course.id || c.documentId === course.documentId);
+      });
 
       const totalLessonsCount = course.lessons?.length || 0;
 
@@ -506,10 +580,21 @@ export default function ManageCoursesPage() {
                           : "bg-white border-gray-200 hover:border-gray-400 shadow-sm"
                       }`}
                     >
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-start justify-between gap-2">
                         <h3 className="font-bold text-gray-900 text-base leading-snug">
                           {course.title}
                         </h3>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCourse(course.documentId || course.id);
+                          }}
+                          className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 p-1 rounded transition"
+                          title="Delete this course"
+                        >
+                          🗑️
+                        </button>
                       </div>
                       
                       <p className="text-xs text-gray-500 line-clamp-2 mt-1.5">
@@ -556,8 +641,8 @@ export default function ManageCoursesPage() {
                     </div>
 
                     <button
-                      onClick={() => handleDeleteCourse(selectedCourse.id)}
-                      className="text-xs font-bold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded border border-red-200 self-start sm:self-auto"
+                      onClick={() => handleDeleteCourse(selectedCourse.documentId || selectedCourse.id)}
+                      className="text-xs font-bold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded border border-red-200 self-start sm:self-auto transition"
                     >
                       🗑️ Delete Course
                     </button>
@@ -774,25 +859,41 @@ export default function ManageCoursesPage() {
 
                                 {/* Questions List */}
                                 <div className="mt-4 pt-3 border-t border-gray-200 space-y-2">
-                                  {quiz.questions?.map((q, qIdx) => (
-                                    <div key={q.id || qIdx} className="bg-white p-3 rounded-lg border border-gray-100 text-xs">
-                                      <div className="font-bold text-gray-800">Q{qIdx + 1}: {q.title}</div>
-                                      <div className="mt-1 flex flex-wrap gap-2 text-gray-500">
-                                        {Array.isArray(q.options) && q.options.map((opt, oIdx) => (
-                                          <span
-                                            key={oIdx}
-                                            className={`px-2 py-0.5 rounded ${
-                                              opt === q.correctAnswer
-                                                ? "bg-green-100 text-green-800 font-bold"
-                                                : "bg-gray-100"
-                                            }`}
-                                          >
-                                            {opt} {opt === q.correctAnswer && "✓"}
-                                          </span>
-                                        ))}
-                                      </div>
+                                  {(!quiz.questions || quiz.questions.length === 0) ? (
+                                    <div className="text-xs text-gray-400 italic py-1">
+                                      No questions added to this quiz yet. Use the form below to add multiple-choice questions.
                                     </div>
-                                  ))}
+                                  ) : (
+                                    quiz.questions.map((q, qIdx) => (
+                                      <div key={q.id || qIdx} className="bg-white p-3 rounded-lg border border-gray-100 text-xs flex items-start justify-between gap-3 shadow-sm">
+                                        <div className="flex-1">
+                                          <div className="font-bold text-gray-800">Q{qIdx + 1}: {q.title}</div>
+                                          <div className="mt-1.5 flex flex-wrap gap-2 text-gray-500">
+                                            {Array.isArray(q.options) && q.options.map((opt, oIdx) => (
+                                              <span
+                                                key={oIdx}
+                                                className={`px-2 py-0.5 rounded ${
+                                                  opt === q.correctAnswer
+                                                    ? "bg-green-100 text-green-800 font-bold border border-green-200"
+                                                    : "bg-gray-100"
+                                                }`}
+                                              >
+                                                {opt} {opt === q.correctAnswer && "✓"}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteQuestion(q.documentId || q.id)}
+                                          className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded transition"
+                                          title="Delete Question"
+                                        >
+                                          🗑️
+                                        </button>
+                                      </div>
+                                    ))
+                                  )}
                                 </div>
 
                                 {/* Add Question to this Quiz Form */}
@@ -800,7 +901,7 @@ export default function ManageCoursesPage() {
                                   <h5 className="text-xs font-bold text-gray-700 uppercase mb-2">
                                     ➕ Add Multiple-Choice Question to "{quiz.title}"
                                   </h5>
-                                  <form onSubmit={(e) => handleAddQuestion(e, quiz.id)} className="space-y-3">
+                                  <form onSubmit={(e) => handleAddQuestion(e, quiz)} className="space-y-3">
                                     <div>
                                       <input
                                         type="text"

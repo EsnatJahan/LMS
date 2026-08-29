@@ -22,7 +22,13 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
     }
 
     if (roleName === 'Instructor') {
-      const course: any = await strapi.entityService.findOne('api::course.course', data.course, {
+      const course: any = await strapi.db.query('api::course.course').findOne({
+        where: {
+          $or: [
+            { id: isNaN(Number(data.course)) ? -1 : Number(data.course) },
+            { documentId: data.course },
+          ],
+        },
         populate: ['instructor'],
       });
       
@@ -48,7 +54,13 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
 
     if (roleName === 'Student') return ctx.forbidden();
 
-    const lesson: any = await strapi.entityService.findOne('api::lesson.lesson', lessonId, {
+    const lesson: any = await strapi.db.query('api::lesson.lesson').findOne({
+      where: {
+        $or: [
+          { id: isNaN(Number(lessonId)) ? -1 : Number(lessonId) },
+          { documentId: lessonId },
+        ],
+      },
       populate: { course: { populate: ['instructor'] } },
     });
 
@@ -74,7 +86,13 @@ export default factories.createCoreController('api::lesson.lesson', ({ strapi })
 
     if (roleName === 'Student') return ctx.forbidden();
 
-    const lesson: any = await strapi.entityService.findOne('api::lesson.lesson', lessonId, {
+    const lesson: any = await strapi.db.query('api::lesson.lesson').findOne({
+      where: {
+        $or: [
+          { id: isNaN(Number(lessonId)) ? -1 : Number(lessonId) },
+          { documentId: lessonId },
+        ],
+      },
       populate: { course: { populate: ['instructor'] } },
     });
 

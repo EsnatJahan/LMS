@@ -19,25 +19,52 @@ export default function QuizTakingPage() {
     async function loadQuiz() {
       try {
         const jwt = localStorage.getItem("jwt");
-        if (!jwt) {
+        if (!jwt || jwt === "undefined" || jwt === "null") {
           alert("Please login first to take the quiz.");
           router.push("/login");
           return;
         }
 
-        const res = await fetch(
-          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/quizzes/${id}?populate[course]=*&populate[questions]=*`,
-          {
-            headers: { Authorization: `Bearer ${jwt}` },
-          }
-        );
+        let quizObj = null;
 
-        const data = await res.json();
-        if (!res.ok) {
-          throw new Error(data?.error?.message || "Failed to load quiz");
+        // 1. Try direct fetch by ID or DocumentId
+        try {
+          const res = await fetch(
+            `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/quizzes/${id}?populate=*`,
+            {
+              headers: { Authorization: `Bearer ${jwt}` },
+            }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.data) quizObj = data.data;
+          }
+        } catch (e) {}
+
+        // 2. Fallback: Search in all quizzes list
+        if (!quizObj) {
+          try {
+            const allRes = await fetch(
+              `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/quizzes?populate=*`,
+              {
+                headers: { Authorization: `Bearer ${jwt}` },
+              }
+            );
+            if (allRes.ok) {
+              const allData = await allRes.json();
+              const list = allData?.data || [];
+              quizObj = list.find(
+                (q) => q.id === Number(id) || q.documentId === id || String(q.id) === String(id)
+              );
+            }
+          } catch (e) {}
         }
 
-        setQuiz(data.data);
+        if (!quizObj) {
+          throw new Error("Quiz not found or is not yet published.");
+        }
+
+        setQuiz(quizObj);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -49,22 +76,35 @@ export default function QuizTakingPage() {
   }, [id, router]);
 
   function handleSelectOption(question, option) {
-    const qId = typeof question === 'object' ? question.id : question;
-    const qDocId = typeof question === 'object' ? question.documentId : question;
-    setSelectedAnswers((prev) => ({
-      ...prev,
-      [qId]: option,
-      ...(qDocId ? { [qDocId]: option } : {}),
-    }));
+    const qId = typeof question === "object" ? question.id : question;
+    const qDocId = typeof question === "object" ? question.documentId : null;
+
+    setSelectedAnswers((prev) => {
+      const next = { ...prev };
+      if (qId) next[qId] = option;
+      if (qDocId) next[qDocId] = option;
+      return next;
+    });
   }
 
   async function handleSubmitQuiz(e) {
     e.preventDefault();
     const questions = quiz.questions || [];
 
-    const answeredCount = Object.keys(selectedAnswers).length;
+    // Count how many questions were answered
+    let answeredCount = 0;
+    questions.forEach((q) => {
+      if (selectedAnswers[q.id] || selectedAnswers[q.documentId]) {
+        answeredCount++;
+      }
+    });
+
     if (answeredCount < questions.length) {
-      if (!confirm(`You have answered ${answeredCount} of ${questions.length} questions. Do you still want to submit?`)) {
+      if (
+        !confirm(
+          `You have answered ${answeredCount} of ${questions.length} questions. Do you still want to submit?`
+        )
+      ) {
         return;
       }
     }
@@ -81,7 +121,7 @@ export default function QuizTakingPage() {
         },
         body: JSON.stringify({
           data: {
-            quiz: quiz.id || id,
+            quiz: quiz.documentId || quiz.id || id,
             answers: selectedAnswers,
           },
         }),
@@ -146,10 +186,10 @@ export default function QuizTakingPage() {
         {/* Navigation */}
         <div className="mb-6">
           <Link
-            href={`/courses/${quiz.course?.documentId || quiz.course?.id}`}
+            href={`/courses/${quiz.course?.documentId || quiz.course?.id || ""}`}
             className="text-sm font-semibold text-gray-600 hover:text-black transition"
           >
-            ← Back to Course: <strong>{quiz.course?.title}</strong>
+            ← Back to Course
           </Link>
         </div>
 
@@ -240,7 +280,7 @@ export default function QuizTakingPage() {
               </button>
 
               <Link
-                href={`/courses/${quiz.course?.documentId || quiz.course?.id}`}
+                href={`/courses/${quiz.course?.documentId || quiz.course?.id || ""}`}
                 className="rounded-lg bg-black px-5 py-2.5 text-sm font-bold text-white hover:bg-gray-800 transition"
               >
                 Back to Course →
@@ -300,21 +340,21 @@ export default function QuizTakingPage() {
                           <label
                             key={oIdx}
                             onClick={() => handleSelectOption(question, option)}
-                            className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition text-sm ${
+                            className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition ${
                               isSelected
-                                ? "bg-indigo-50/50 border-indigo-600 ring-1 ring-indigo-600 text-indigo-950 font-semibold"
-                                : "bg-gray-50 border-gray-200 hover:border-gray-400 text-gray-700"
+                                ? "bg-black text-white border-black shadow-sm"
+                                : "bg-gray-50/70 border-gray-200 text-gray-700 hover:bg-gray-100"
                             }`}
                           >
                             <input
                               type="radio"
-                              name={`question-${question.id}`}
+                              name={`question-${question.id || question.documentId || qIdx}`}
                               value={option}
                               checked={isSelected}
                               onChange={() => handleSelectOption(question, option)}
-                              className="accent-indigo-600 w-4 h-4"
+                              className="w-4 h-4 text-black focus:ring-black"
                             />
-                            <span>{option}</span>
+                            <span className="text-sm font-medium">{option}</span>
                           </label>
                         );
                       })}
@@ -324,23 +364,24 @@ export default function QuizTakingPage() {
               })
             )}
 
-            {/* Submit Bar */}
+            {/* Submit Action */}
             {questions.length > 0 && (
-              <div className="rounded-2xl bg-white p-6 shadow-sm border border-gray-100 flex items-center justify-between">
-                <div className="text-xs text-gray-500">
-                  {Object.keys(selectedAnswers).length} of {questions.length} questions answered
-                </div>
-
+              <div className="flex items-center justify-end gap-4 pt-4">
+                <Link
+                  href={`/courses/${quiz.course?.documentId || quiz.course?.id || ""}`}
+                  className="rounded-lg border border-gray-300 bg-white px-5 py-3 text-sm font-bold text-gray-700 hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </Link>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="rounded-lg bg-black px-6 py-3 text-sm font-bold text-white hover:bg-gray-800 transition disabled:bg-gray-400 shadow-sm"
+                  className="rounded-lg bg-black px-8 py-3 text-sm font-bold text-white hover:bg-gray-800 disabled:bg-gray-400 transition shadow-sm"
                 >
-                  {submitting ? "Grading Quiz..." : "Submit & Auto-Grade Quiz →"}
+                  {submitting ? "Submitting & Auto-Grading..." : "Submit Answers →"}
                 </button>
               </div>
             )}
-
           </form>
         )}
 
@@ -348,4 +389,3 @@ export default function QuizTakingPage() {
     </main>
   );
 }
-
