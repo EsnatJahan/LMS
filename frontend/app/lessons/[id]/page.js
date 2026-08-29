@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
-export default function LessonDetails() {
+export default function LessonPage() {
   const params = useParams();
 
   const [lesson, setLesson] = useState(null);
@@ -15,7 +16,7 @@ export default function LessonDetails() {
     async function fetchLesson() {
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/lessons/${params.id}?populate=*`
+          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/lessons/${params.id}?populate=course`
         );
 
         const data = await response.json();
@@ -38,7 +39,7 @@ export default function LessonDetails() {
   }, [params.id]);
 
   if (loading) {
-    return <main className="p-10">Loading...</main>;
+    return <main className="p-10">Loading lesson...</main>;
   }
 
   if (error) {
@@ -57,28 +58,24 @@ export default function LessonDetails() {
     <main className="min-h-screen bg-gray-100 p-8">
       <div className="mx-auto max-w-4xl">
 
-       {lesson.course && (
-            <Link
-                href={`/courses/${lesson.course.documentId}`}
-                className="mb-6 inline-block text-blue-600 hover:underline"
-            >
-                ← Back to {lesson.course.title}
-            </Link>
-        )}
+        <Link
+          href={`/courses/${lesson.course?.documentId}`}
+          className="text-blue-600"
+        >
+          ← Back to Course
+        </Link>
 
-        <h1 className="text-4xl font-bold">
-          {lesson.title}
-        </h1>
+        <article className="mt-6 rounded-lg bg-white p-8 shadow">
 
-        <div className="mt-8 rounded-lg bg-white p-6 shadow">
-          <h2 className="text-2xl font-bold">
-            Lesson Content
-          </h2>
+          <h1 className="text-3xl font-bold">
+            {lesson.title}
+          </h1>
 
-          <p className="mt-4 whitespace-pre-line text-gray-700">
+          <div className="mt-6 whitespace-pre-wrap text-gray-700">
             {lesson.content}
-          </p>
-        </div>
+          </div>
+
+        </article>
 
       </div>
     </main>

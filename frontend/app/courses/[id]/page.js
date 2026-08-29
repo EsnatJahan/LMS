@@ -1,162 +1,153 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function CourseDetails() {
-  const params = useParams();
+  const { id } = useParams(); // This is likely the course documentId
+  const router = useRouter();
 
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
   const [enrolling, setEnrolling] = useState(false);
-  const [enrollMessage, setEnrollMessage] = useState("");
+  const [isEnrolled, setIsEnrolled] = useState(false);
 
   useEffect(() => {
-    async function fetchCourse() {
+    async function loadCourseAndEnrollment() {
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/courses/${params.id}?populate=*`
+        // 1. Fetch Course details
+        const courseRes = await fetch(
+          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/courses/${id}?populate=*`
         );
+        const courseData = await courseRes.json();
+        setCourse(courseData.data);
 
-        const data = await response.json();
+        // 2. Check Enrollment Status (if user is logged in)
+        const jwt = localStorage.getItem("jwt");
+        const userStr = localStorage.getItem("user");
 
-        if (!response.ok) {
-          throw new Error("Failed to load course");
+        if (jwt && userStr) {
+          const user = JSON.parse(userStr);
+          
+          // Filter enrollments by both the Course ID and the User ID
+          const enrollRes = await fetch(
+            `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/enrollments?filters[course][documentId][$eq]=${id}&filters[users_permissions_user][id][$eq]=${user.id}`,
+            {
+              headers: {
+                Authorization: `Bearer ${jwt}`,
+              },
+            }
+          );
+          
+          const enrollData = await enrollRes.json();
+          
+          // If the data array has items, the user is already enrolled
+          if (enrollData?.data && enrollData.data.length > 0) {
+            setIsEnrolled(true);
+          }
         }
-
-        setCourse(data.data);
       } catch (error) {
-        setError(error.message);
+        console.error(error);
       } finally {
         setLoading(false);
       }
     }
 
-    if (params.id) {
-      fetchCourse();
+    if (id) loadCourseAndEnrollment();
+  }, [id]);
+
+  const handleEnroll = async () => {
+    const jwt = localStorage.getItem("jwt");
+
+    if (!jwt) {
+      alert("Please login first to enroll.");
+      router.push("/login");
+      return;
     }
-  }, [params.id]);
 
-  async function handleEnroll() {
-  setEnrollMessage("");
+    setEnrolling(true);
 
-  const jwt = localStorage.getItem("jwt");
-  const storedUser = localStorage.getItem("user");
-
-  if (!jwt || !storedUser) {
-    setEnrollMessage("Please login first.");
-    return;
-  }
-
-  const user = JSON.parse(storedUser);
-
-  setEnrolling(true);
-
-  try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/enrollments`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${jwt}`,
-        },
-        body: JSON.stringify({
-          data: {
-            users_permissions_user: user.id,
-            course: course.id,
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/enrollments`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${jwt}`,
           },
-        }),
+          body: JSON.stringify({
+            data: {
+              course: id, // Using numeric ID for relation creation
+            },
+          }),
+        }
+      );
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result?.error?.message || "Failed to enroll");
       }
-    );
 
-    const data = await response.json();
-
-    console.log("Enrollment response:", data);
-
-    // if (!response.ok) {
-    //   throw new Error(
-    //     data?.error?.message || "Enrollment failed"
-    //   );
-    // }
-
-//    setEnrollMessage("Successfully enrolled!");
-  } catch (error) {
-    console.error("Enrollment error:", error);
-    setEnrollMessage(error.message);
-  } finally {
-    setEnrolling(false);
-  }
-}
+      alert("Successfully enrolled in the course!");
+      setIsEnrolled(true); // Update state instantly so button disappears
+      
+    } catch (error) {
+      console.error("ENROLL ERROR:", error);
+      alert(error.message);
+    } finally {
+      setEnrolling(false);
+    }
+  };
 
   if (loading) {
-    return <main className="p-10">Loading...</main>;
-  }
-
-  if (error) {
-    return (
-      <main className="p-10 text-red-600">
-        {error}
-      </main>
-    );
+    return <div className="p-10">Loading...</div>;
   }
 
   if (!course) {
-    return <main className="p-10">Course not found.</main>;
+    return <div className="p-10">Course not found</div>;
   }
 
   return (
-    <main className="min-h-screen bg-gray-100 p-8">
-      <div className="mx-auto max-w-4xl">
+    <main className="p-8">
+      <h1 className="text-3xl font-bold">{course.title}</h1>
 
-        <h1 className="text-4xl font-bold">
-          {course.title}
-        </h1>
+      <p className="mt-3 text-gray-600">
+        {course.description}
+      </p>
 
-        <p className="mt-4 text-gray-600">
-          {course.description}
-        </p>
+      <h2 className="mt-8 text-2xl font-bold">
+        Lessons
+      </h2>
 
-        <section className="mt-8">
-          <h2 className="text-2xl font-bold">
-            Lessons
-          </h2>
+      <div className="mt-4 space-y-3">
+        {course.lessons?.map((lesson) => (
+          <Link
+            key={lesson.id}
+            href={`/lessons/${lesson.documentId}`}
+            className="block rounded bg-gray-100 p-4 hover:bg-gray-200"
+          >
+            {lesson.title}
+          </Link>
+        ))}
+      </div>
 
-          <div className="mt-4 space-y-3">
-            {(course.lessons || []).map((lesson, index) => (
-              <div
-                key={lesson.documentId || lesson.id}
-                className="rounded bg-white p-4 shadow"
-              >
-                <p className="font-semibold">
-                  {index + 1}. {lesson.title}
-                </p>
-
-                <p className="mt-2 text-gray-600">
-                  {lesson.content}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-
+      {/* Conditionally render the button based on enrollment status */}
+      {!isEnrolled ? (
         <button
           onClick={handleEnroll}
           disabled={enrolling}
-          className="mt-8 rounded bg-black px-6 py-3 text-white disabled:opacity-50"
+          className="mt-8 rounded bg-black px-6 py-3 text-white disabled:bg-gray-500"
         >
           {enrolling ? "Enrolling..." : "Enroll"}
         </button>
-
-        {enrollMessage && (
-          <p className="mt-4 font-medium">
-            {enrollMessage}
-          </p>
-        )}
-
-      </div>
+      ) : (
+        <div className="mt-8 inline-block rounded bg-green-100 px-6 py-3 text-green-800 font-semibold">
+          ✅ You are enrolled in this course
+        </div>
+      )}
     </main>
   );
 }

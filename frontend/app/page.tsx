@@ -1,12 +1,12 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-export default function Home() {
+export default function CoursesPage() {
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     async function fetchCourses() {
@@ -17,13 +17,11 @@ export default function Home() {
 
         const data = await response.json();
 
-        if (!response.ok) {
-          throw new Error("Failed to load courses");
+        if (response.ok) {
+          setCourses(data.data || []);
         }
-
-        setCourses(data.data || []);
       } catch (error) {
-        setError(error.message);
+        console.error(error);
       } finally {
         setLoading(false);
       }
@@ -32,54 +30,49 @@ export default function Home() {
     fetchCourses();
   }, []);
 
+  if (loading) {
+    return <main className="p-10">Loading courses...</main>;
+  }
+
   return (
     <main className="min-h-screen bg-gray-100 p-8">
       <div className="mx-auto max-w-6xl">
-        <h1 className="text-4xl font-bold">
-          Learning Management System
+        <h1 className="text-3xl font-bold mb-6">
+          Courses
         </h1>
 
-        <p className="mt-2 text-gray-600">
-          Explore our courses
-        </p>
-
-        {loading && (
-          <p className="mt-8">Loading courses...</p>
-        )}
-
-        {error && (
-          <p className="mt-8 text-red-600">{error}</p>
-        )}
-
-        {!loading && !error && courses.length === 0 && (
-          <p className="mt-8">
-            No courses available.
-          </p>
-        )}
-
-        <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {courses.map((course) => (
-            <div
-              key={course.documentId || course.id}
-              className="rounded-lg bg-white p-6 shadow"
-            >
-              <h2 className="text-xl font-bold">
-                {course.title}
-              </h2>
-
-              <p className="mt-3 text-gray-600">
-                {course.description}
-              </p>
-
-              <Link
-                href={`/courses/${course.documentId || course.id}`}
-                className="mt-5 inline-block rounded bg-black px-4 py-2 text-white"
+        {courses.length === 0 ? (
+          <p>No courses available.</p>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {courses.map((course) => (
+              <div
+                key={course.documentId}
+                className="rounded-lg bg-white p-6 shadow"
               >
-                View Course
-              </Link>
-            </div>
-          ))}
-        </div>
+                <h2 className="text-xl font-bold">
+                  {course.title}
+                </h2>
+
+                <p className="mt-2 text-gray-600">
+                  {course.description}
+                </p>
+
+                <p className="mt-3 text-sm text-gray-500">
+                  Instructor:{" "}
+                  {course.instructor?.username || "Not assigned"}
+                </p>
+
+                <Link
+                  href={`/courses/${course.documentId}`}
+                  className="mt-5 inline-block rounded bg-black px-5 py-2 text-white"
+                >
+                  View Course
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </main>
   );
