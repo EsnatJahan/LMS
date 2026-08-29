@@ -100,7 +100,6 @@ export default factories.createCoreController('api::course.course', ({ strapi })
           title,
           description,
           instructor: instructorId,
-          publishedAt: new Date(),
         },
       });
       const sanitizedEntity = await (this as any).sanitizeOutput(course, ctx);
