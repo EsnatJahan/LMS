@@ -164,7 +164,6 @@ export default function CourseDetails() {
     const userStr = localStorage.getItem("user");
 
     if (!jwt || !userStr || jwt === "undefined" || jwt === "null") {
-      alert("Please login first to enroll in this course.");
       toast.info("Please log in first to enroll in this course.");
       router.push("/login");
       return;
@@ -177,7 +176,6 @@ export default function CourseDetails() {
 
     const roleName = userObj?.role?.name || "Student";
     if (roleName !== "Student" && roleName !== "Authenticated") {
-      alert(`Course enrollment is for students. Your current role is: ${roleName}`);
       toast.info(`Course enrollment is for students. Your current role is: ${roleName}`);
       return;
     }
@@ -202,7 +200,6 @@ export default function CourseDetails() {
         localStorage.removeItem("jwt");
         localStorage.removeItem("user");
         window.dispatchEvent(new Event("authChange"));
-        alert("Your session has expired. Please log in again to enroll.");
         toast.error("Your session has expired. Please log in again to enroll.");
         router.push("/login");
         return;
@@ -217,12 +214,10 @@ export default function CourseDetails() {
         throw new Error(result?.error?.message || "Failed to enroll");
       }
 
-      alert("Successfully enrolled in this course! You now have full access to all lessons.");
       toast.success("Successfully enrolled in this course! You now have full access to all lessons.");
       setIsEnrolled(true);
     } catch (error) {
       console.error("ENROLL ERROR:", error);
-      alert(error.message);
       toast.error(error.message);
     } finally {
       setEnrolling(false);
@@ -423,11 +418,9 @@ export default function CourseDetails() {
                         if (!isEnrolled) {
                           e.preventDefault();
                           if (!currentUser) {
-                            alert("Please log in and enroll to access the lessons.");
                             toast.info("Please log in and enroll to access the lessons.");
                             router.push("/login");
                           } else {
-                            alert("Please enroll in this course above to access the lessons.");
                             toast.info("Please enroll in this course above to access the lessons.");
                           }
                         }

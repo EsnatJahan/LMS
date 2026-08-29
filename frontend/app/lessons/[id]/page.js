@@ -87,7 +87,6 @@ export default function LessonPage() {
     const jwt = localStorage.getItem("jwt");
     
     if (!jwt) {
-      alert("Please login first.");
       toast.info("Please log in first to track lesson progress.");
       return;
     }
@@ -117,12 +116,10 @@ export default function LessonPage() {
       }
       
       setIsCompleted(true);
-      alert("Lesson marked as complete! Your course progress has been updated.");
       toast.success("Lesson marked as complete! Your course progress has been updated.");
       
     } catch (err) {
       console.error("Progress Error:", err);
-      alert(err.message);
       toast.error(err.message);
     } finally {
       setCompleting(false);

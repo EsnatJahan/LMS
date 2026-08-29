@@ -18,7 +18,6 @@ async function handleSubmit(e) {
     const jwt = localStorage.getItem("jwt");
 
     if (!jwt) {
-      alert("Please login first.");
       toast.info("Please log in first.");
       return;
     }
@@ -42,23 +41,18 @@ async function handleSubmit(e) {
 
     const data = await response.json();
 
-    console.log("STATUS:", response.status);
-    console.log("RESPONSE:", data);
-
     if (!response.ok) {
       throw new Error(
         data?.error?.message || "Course creation failed"
       );
     }
 
-    alert("Course created successfully!");
     toast.success("Course created successfully!");
 
     setTitle("");
     setDescription("");
   } catch (error) {
     console.error("CREATE COURSE ERROR:", error);
-    alert(error.message);
     toast.error(error.message);
   }
 }
