@@ -2,6 +2,7 @@ import { factories } from '@strapi/strapi';
 
 export default factories.createCoreController('api::course.course', ({ strapi }) => ({
   
+  // 1. FIND (Enrich with instructor data)
   async find(ctx) {
     const res = await super.find(ctx);
     const data = res?.data;
@@ -32,6 +33,7 @@ export default factories.createCoreController('api::course.course', ({ strapi })
     return { ...res, data: enrichedData };
   },
 
+  // 2. FIND ONE
   async findOne(ctx) {
     const res = await super.findOne(ctx);
     const d = res?.data;
@@ -59,6 +61,7 @@ export default factories.createCoreController('api::course.course', ({ strapi })
     return res;
   },
 
+  // 3. CREATE (Support Admin/Content Manager assigning instructor)
   async create(ctx) {
     const user = ctx.state.user;
     if (!user) return ctx.unauthorized();
@@ -73,11 +76,32 @@ export default factories.createCoreController('api::course.course', ({ strapi })
       return ctx.forbidden('Students cannot create courses.');
     }
 
-    const { title, description } = ctx.request.body.data || {};
+    const { title, description, instructor } = ctx.request.body.data || {};
+    let instructorId = user.id;
+
+    if ((roleName === 'Admin' || roleName === 'Content Manager') && instructor) {
+      const targetInstructor: any = await strapi.db.query('plugin::users-permissions.user').findOne({
+        where: {
+          $or: [
+            { id: isNaN(Number(instructor)) ? -1 : Number(instructor) },
+            { documentId: instructor },
+            { username: instructor },
+          ],
+        },
+      });
+      if (targetInstructor) {
+        instructorId = targetInstructor.id;
+      }
+    }
 
     try {
       const course = await strapi.entityService.create('api::course.course', {
-        data: { title, description, instructor: user.id },
+        data: {
+          title,
+          description,
+          instructor: instructorId,
+          publishedAt: new Date(),
+        },
       });
       const sanitizedEntity = await (this as any).sanitizeOutput(course, ctx);
       return (this as any).transformResponse(sanitizedEntity);
@@ -86,6 +110,7 @@ export default factories.createCoreController('api::course.course', ({ strapi })
     }
   },
 
+  // 4. UPDATE (Support Admin/Content Manager assigning/reassigning instructor)
   async update(ctx) {
     const user = ctx.state.user;
     const courseId = ctx.params.id;
@@ -114,9 +139,60 @@ export default factories.createCoreController('api::course.course', ({ strapi })
       return ctx.unauthorized('Instructors can only edit their own courses.');
     }
 
-    return super.update(ctx);
+    const { title, description, instructor } = ctx.request.body.data || {};
+
+    let targetInstructorId = course.instructor?.id;
+    if ((roleName === 'Admin' || roleName === 'Content Manager') && instructor !== undefined) {
+      if (instructor) {
+        const targetInstructor: any = await strapi.db.query('plugin::users-permissions.user').findOne({
+          where: {
+            $or: [
+              { id: isNaN(Number(instructor)) ? -1 : Number(instructor) },
+              { documentId: instructor },
+              { username: instructor },
+            ],
+          },
+        });
+        targetInstructorId = targetInstructor ? targetInstructor.id : null;
+      } else {
+        targetInstructorId = null;
+      }
+    }
+
+    // Update all matching rows of this course
+    const allMatchingCourses = await strapi.db.query('api::course.course').findMany({
+      where: { documentId: course.documentId },
+    });
+
+    for (const c of allMatchingCourses) {
+      await strapi.db.query('api::course.course').update({
+        where: { id: c.id },
+        data: {
+          ...(title ? { title } : {}),
+          ...(description !== undefined ? { description } : {}),
+          instructor: targetInstructorId,
+        },
+      });
+    }
+
+    const updatedCourse: any = await strapi.db.query('api::course.course').findOne({
+      where: { id: course.id },
+      populate: ['instructor', 'lessons', 'quizzes'],
+    });
+
+    if (updatedCourse && updatedCourse.instructor) {
+      updatedCourse.instructor = {
+        id: updatedCourse.instructor.id,
+        documentId: updatedCourse.instructor.documentId,
+        username: updatedCourse.instructor.username,
+        email: updatedCourse.instructor.email,
+      };
+    }
+
+    return ctx.send({ data: updatedCourse });
   },
 
+  // 5. DELETE (Cascading delete)
   async delete(ctx) {
     const user = ctx.state.user;
     const courseId = ctx.params.id;

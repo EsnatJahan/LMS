@@ -137,18 +137,18 @@ export default function Navbar() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <Link
                 href="/login"
-                className="rounded-md border border-gray-300 bg-white px-3.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+                className="rounded-lg border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-bold text-gray-700 hover:bg-gray-50 transition shadow-sm"
               >
-                Login
+                Sign In
               </Link>
               <Link
                 href="/register"
-                className="rounded-md bg-black px-3.5 py-1.5 text-sm font-medium text-white hover:bg-gray-800 transition"
+                className="rounded-lg bg-black px-4 py-1.5 text-xs font-bold text-white hover:bg-gray-800 transition shadow-sm"
               >
-                Register
+                Sign Up Free
               </Link>
             </div>
           )}

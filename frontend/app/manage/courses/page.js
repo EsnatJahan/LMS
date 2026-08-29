@@ -20,6 +20,12 @@ export default function ManageCoursesPage() {
   const [newDescription, setNewDescription] = useState("");
   const [creating, setCreating] = useState(false);
 
+  // Edit Course Modal States
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
   // Lesson Form States
   const [lessonTitle, setLessonTitle] = useState("");
   const [lessonContent, setLessonContent] = useState("");
@@ -43,6 +49,11 @@ export default function ManageCoursesPage() {
   const [enrolledStudents, setEnrolledStudents] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
 
+  // Instructor assignment states for Admin / Content Manager
+  const [instructorsList, setInstructorsList] = useState([]);
+  const [selectedInstructorForNewCourse, setSelectedInstructorForNewCourse] = useState("");
+  const [updatingInstructor, setUpdatingInstructor] = useState(false);
+
   useEffect(() => {
     async function loadData() {
       try {
@@ -62,6 +73,22 @@ export default function ManageCoursesPage() {
           setError("Students do not have permission to access the Course Management Hub.");
           setLoading(false);
           return;
+        }
+
+        if (roleName === "Admin" || roleName === "Content Manager") {
+          try {
+            const usersRes = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/admin/users`, {
+              headers: { Authorization: `Bearer ${jwt}` },
+            });
+            if (usersRes.ok) {
+              const usersData = await usersRes.json();
+              setInstructorsList(
+                (usersData.data || []).filter(
+                  (u) => u.role?.name === "Instructor" || u.role?.name === "Admin" || u.role?.name === "Content Manager"
+                )
+              );
+            }
+          } catch (e) {}
         }
 
         await fetchCourses(jwt, user);
@@ -112,21 +139,19 @@ export default function ManageCoursesPage() {
         };
       });
 
-      // If instructor, filter to own courses or unassigned courses (with fallback)
+      // If instructor, filter STRICTLY to own authored courses only
       if (roleName === "Instructor") {
         const uId = user?.id || currentUser?.id;
         const uDocId = user?.documentId || currentUser?.documentId;
         const uName = user?.username || currentUser?.username;
 
-        const myFiltered = courseList.filter(
+        courseList = courseList.filter(
           (c) =>
-            !c.instructor ||
-            c.instructor?.id === uId ||
-            c.instructor?.documentId === uDocId ||
-            c.instructor?.username === uName
+            c.instructor &&
+            (c.instructor?.id === uId ||
+              c.instructor?.documentId === uDocId ||
+              c.instructor?.username === uName)
         );
-
-        courseList = myFiltered.length > 0 ? myFiltered : courseList;
       }
 
       setCourses(courseList);
@@ -156,6 +181,7 @@ export default function ManageCoursesPage() {
           data: {
             title: newTitle,
             description: newDescription,
+            instructor: selectedInstructorForNewCourse || undefined,
           },
         }),
       });
@@ -166,6 +192,7 @@ export default function ManageCoursesPage() {
       alert("Course created successfully!");
       setNewTitle("");
       setNewDescription("");
+      setSelectedInstructorForNewCourse("");
       setShowCreateModal(false);
       await fetchCourses();
     } catch (err) {
@@ -175,8 +202,107 @@ export default function ManageCoursesPage() {
     }
   }
 
+  // Update Course Instructor
+  async function handleUpdateCourseInstructor(courseIdentifier, newInstructorId) {
+    setUpdatingInstructor(true);
+    try {
+      const jwt = localStorage.getItem("jwt");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/courses/${courseIdentifier}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({
+          data: {
+            instructor: newInstructorId || null,
+          },
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to reassign instructor");
+      alert("Course instructor updated successfully!");
+      await fetchCourses();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setUpdatingInstructor(false);
+    }
+  }
+
+  // Edit Course Handlers
+  function openEditCourseModal(course) {
+    if (roleName === "Instructor") {
+      const uId = currentUser?.id;
+      const uDocId = currentUser?.documentId;
+      const uName = currentUser?.username;
+      const isOwner =
+        course.instructor &&
+        (course.instructor.id === uId ||
+          course.instructor.documentId === uDocId ||
+          course.instructor.username === uName);
+      if (!isOwner) {
+        alert("You can only edit your own courses.");
+        return;
+      }
+    }
+    setEditTitle(course.title || "");
+    setEditDescription(course.description || "");
+    setShowEditModal(true);
+  }
+
+  async function handleSaveEditCourse(e) {
+    e.preventDefault();
+    if (!selectedCourse) return;
+    setSavingEdit(true);
+
+    try {
+      const jwt = localStorage.getItem("jwt");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/courses/${selectedCourse.documentId || selectedCourse.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({
+          data: {
+            title: editTitle,
+            description: editDescription,
+          },
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error?.message || "Failed to update course details");
+
+      alert("Course details updated successfully!");
+      setShowEditModal(false);
+      await fetchCourses();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   // Delete Course
   async function handleDeleteCourse(courseIdentifier) {
+    const targetCourse = courses.find((c) => c.id === courseIdentifier || c.documentId === courseIdentifier);
+    if (roleName === "Instructor" && targetCourse) {
+      const uId = currentUser?.id;
+      const uDocId = currentUser?.documentId;
+      const uName = currentUser?.username;
+      const isOwner =
+        targetCourse.instructor &&
+        (targetCourse.instructor.id === uId ||
+          targetCourse.instructor.documentId === uDocId ||
+          targetCourse.instructor.username === uName);
+      if (!isOwner) {
+        alert("You can only delete your own courses.");
+        return;
+      }
+    }
+
     if (!confirm("Are you sure you want to delete this course and all its lessons/quizzes? This action cannot be undone.")) return;
 
     try {
@@ -524,6 +650,23 @@ export default function ManageCoursesPage() {
                     required
                   />
                 </div>
+                {(isAdmin || isContentManager) && instructorsList.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Assign Instructor</label>
+                    <select
+                      value={selectedInstructorForNewCourse}
+                      onChange={(e) => setSelectedInstructorForNewCourse(e.target.value)}
+                      className="w-full rounded-lg border border-gray-300 p-2.5 text-sm bg-white focus:border-black focus:outline-none"
+                    >
+                      <option value="">-- Assign to Me or Choose Instructor --</option>
+                      {instructorsList.map((inst) => (
+                        <option key={inst.id} value={inst.id}>
+                          {inst.username} ({inst.role?.name})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="flex items-center justify-end gap-2 pt-2">
                   <button
                     type="button"
@@ -538,6 +681,53 @@ export default function ManageCoursesPage() {
                     className="rounded-lg bg-black px-5 py-2 text-sm font-bold text-white hover:bg-gray-800 disabled:bg-gray-400"
                   >
                     {creating ? "Creating..." : "Save Course"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Course Modal */}
+        {showEditModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl border border-gray-100">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Edit Course Details</h2>
+              <form onSubmit={handleSaveEditCourse} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Course Title</label>
+                  <input
+                    type="text"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-black focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    rows={4}
+                    className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-black focus:outline-none"
+                    required
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingEdit}
+                    className="rounded-lg bg-black px-5 py-2 text-sm font-bold text-white hover:bg-gray-800 disabled:bg-gray-400"
+                  >
+                    {savingEdit ? "Saving..." : "Save Changes"}
                   </button>
                 </div>
               </form>
@@ -631,8 +821,32 @@ export default function ManageCoursesPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h2 className="text-2xl font-black text-gray-900">{selectedCourse.title}</h2>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                        <span>Instructor: <strong>{selectedCourse.instructor?.username || "Not assigned"}</strong></span>
+                      <div className="flex flex-wrap items-center gap-2.5 mt-1 text-xs text-gray-600">
+                        <span className="font-semibold">Instructor:</span>
+                        {(isAdmin || isContentManager) && instructorsList.length > 0 ? (
+                          <div className="flex items-center gap-1.5">
+                            <select
+                              value={selectedCourse.instructor?.id || ""}
+                              disabled={updatingInstructor}
+                              onChange={(e) => handleUpdateCourseInstructor(selectedCourse.documentId || selectedCourse.id, e.target.value)}
+                              className="rounded-lg border border-gray-300 px-2 py-1 text-xs bg-white focus:border-black focus:outline-none font-medium cursor-pointer"
+                            >
+                              <option value="">-- Unassigned --</option>
+                              {instructorsList.map((inst) => (
+                                <option key={inst.id} value={inst.id}>
+                                  {inst.username} ({inst.role?.name})
+                                </option>
+                              ))}
+                            </select>
+                            {updatingInstructor && (
+                              <span className="text-[11px] text-blue-600 animate-pulse font-semibold">
+                                Saving...
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <strong className="text-gray-900">{selectedCourse.instructor?.username || "Not assigned"}</strong>
+                        )}
                         <span>•</span>
                         <Link href={`/courses/${selectedCourse.documentId || selectedCourse.id}`} className="text-blue-600 hover:underline">
                           View Public Course Page ↗
@@ -640,12 +854,20 @@ export default function ManageCoursesPage() {
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleDeleteCourse(selectedCourse.documentId || selectedCourse.id)}
-                      className="text-xs font-bold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded border border-red-200 self-start sm:self-auto transition"
-                    >
-                      🗑️ Delete Course
-                    </button>
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <button
+                        onClick={() => openEditCourseModal(selectedCourse)}
+                        className="text-xs font-bold text-gray-700 hover:text-black bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded border border-gray-200 transition"
+                      >
+                        ✏️ Edit Course
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCourse(selectedCourse.documentId || selectedCourse.id)}
+                        className="text-xs font-bold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded border border-red-200 transition"
+                      >
+                        🗑️ Delete Course
+                      </button>
+                    </div>
                   </div>
 
                   {/* Navigation Tabs */}

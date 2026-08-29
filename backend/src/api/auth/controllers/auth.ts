@@ -4,32 +4,27 @@ import bcrypt from 'bcryptjs';
 export default {
   // 1. POST /api/custom-auth/register
   async register(ctx: any) {
-    const { username, email, password, role } = ctx.request.body || {};
+    const { username, email, password } = ctx.request.body || {};
 
     if (!username || !email || !password) {
       return ctx.badRequest('Username, email, and password are required.');
     }
 
-    // Check if user or email exists
-    const existing = await strapi.db.query('plugin::users-permissions.user').findOne({
-      where: {
-        $or: [{ email: email.toLowerCase() }, { username }],
-      },
-    });
-
-    if (existing) {
-      return ctx.badRequest('An account with this email or username already exists.');
-    }
-
     try {
-      // Resolve requested role (allow Student, Instructor, Content Manager; default to Student)
-      let targetRoleName = 'Student';
-      if (role && ['Student', 'Instructor', 'Content Manager'].includes(role)) {
-        targetRoleName = role;
+      // Check if user or email exists
+      const existing = await strapi.db.query('plugin::users-permissions.user').findOne({
+        where: {
+          $or: [{ email: email.toLowerCase() }, { username }],
+        },
+      });
+
+      if (existing) {
+        return ctx.badRequest('An account with this email or username already exists.');
       }
 
+      // Enforce Student role for all public registrations (Admin can promote via Admin Panel)
       let targetRole: any = await strapi.db.query('plugin::users-permissions.role').findOne({
-        where: { name: targetRoleName },
+        where: { name: 'Student' },
       });
 
       if (!targetRole) {

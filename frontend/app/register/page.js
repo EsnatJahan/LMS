@@ -10,7 +10,6 @@ export default function RegisterPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("Student");
 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,7 +31,6 @@ export default function RegisterPage() {
             username,
             email,
             password,
-            role,
           }),
         }
       );
@@ -47,12 +45,7 @@ export default function RegisterPage() {
       localStorage.setItem("user", JSON.stringify(data.user));
 
       window.dispatchEvent(new Event("authChange"));
-
-      if (role === "Instructor" || role === "Content Manager") {
-        router.push("/manage/courses");
-      } else {
-        router.push("/dashboard");
-      }
+      router.push("/dashboard");
     } catch (error) {
       setError(error.message);
     } finally {
@@ -61,81 +54,68 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-      <div className="w-full max-w-md rounded-xl bg-white p-8 shadow-md border border-gray-100">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
-            Create Account
+    <main className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 sm:p-10 shadow-sm border border-gray-200">
+        
+        <div className="text-center mb-8">
+          <Link href="/" className="inline-flex items-center gap-2 text-2xl font-black text-gray-900 tracking-tight mb-2">
+            <span className="bg-black text-white px-3 py-1 rounded-lg text-base font-bold">LMS</span>
+            <span>Academy</span>
+          </Link>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight mt-3">
+            Create Student Account
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Join LMS Academy and start learning or teaching
+            Sign up for free to access all courses, lessons, and quizzes
           </p>
         </div>
 
-        <form onSubmit={handleRegister} className="space-y-4">
+        <form onSubmit={handleRegister} className="space-y-5">
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-700">
               Username
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
-              placeholder="johndoe"
+              className="w-full rounded-xl border border-gray-300 p-3 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black transition"
+              placeholder="e.g. johndoe"
               required
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-700">
               Email Address
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
-              placeholder="john@example.com"
+              className="w-full rounded-xl border border-gray-300 p-3 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black transition"
+              placeholder="e.g. john@example.com"
               required
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">
+            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-700">
               Password
             </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 p-2.5 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
-              placeholder="••••••••"
+              className="w-full rounded-xl border border-gray-300 p-3 text-sm focus:border-black focus:outline-none focus:ring-1 focus:ring-black transition"
+              placeholder="At least 6 characters"
               required
               minLength={6}
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">
-              Select Your Role
-            </label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 p-2.5 text-sm bg-white focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
-            >
-              <option value="Student">🎓 Student (Enroll, Learn, Take Quizzes)</option>
-              <option value="Instructor">👨‍🏫 Instructor (Create & Manage Courses, Quizzes)</option>
-              <option value="Content Manager">✍️ Content Manager (Manage Platform Content & Blog)</option>
-            </select>
-            <p className="text-xs text-gray-400 mt-1">
-              Admin accounts are assigned by system administrators.
-            </p>
-          </div>
-
           {error && (
-            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 border border-red-200">
+            <div className="rounded-xl bg-red-50 p-3.5 text-xs font-semibold text-red-600 border border-red-200">
               {error}
             </div>
           )}
@@ -143,18 +123,21 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-black py-2.5 text-sm font-bold text-white hover:bg-gray-800 transition disabled:bg-gray-400 mt-2"
+            className="w-full rounded-xl bg-black py-3.5 text-sm font-bold text-white hover:bg-gray-800 transition disabled:bg-gray-400 shadow-sm mt-2"
           >
-            {loading ? "Creating Account..." : "Sign Up"}
+            {loading ? "Creating Account..." : "Create Student Account"}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-gray-600">
-          Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-black hover:underline">
-            Login here
-          </Link>
-        </p>
+        <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+          <p className="text-sm text-gray-600">
+            Already have an account?{" "}
+            <Link href="/login" className="font-bold text-black hover:underline">
+              Sign in here →
+            </Link>
+          </p>
+        </div>
+
       </div>
     </main>
   );
