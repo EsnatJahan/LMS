@@ -64,33 +64,6 @@ export default function QuizTakingPage() {
           throw new Error("Quiz not found or is not yet published.");
         }
 
-        // Ensure questions are populated even if shallow relation was returned
-        if (!quizObj.questions || quizObj.questions.length === 0) {
-          try {
-            const qRes = await fetch(
-              `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/questions?populate=*`,
-              { headers: { Authorization: `Bearer ${jwt}` } }
-            );
-            if (qRes.ok) {
-              const qData = await qRes.json();
-              const matched = (qData.data || []).filter((item) => {
-                const qz = item.quiz;
-                return (
-                  qz &&
-                  (qz.id === quizObj.id ||
-                    qz.documentId === quizObj.documentId ||
-                    qz.documentId === id ||
-                    String(qz.id) === String(id) ||
-                    qz.title === quizObj.title)
-                );
-              });
-              if (matched.length > 0) {
-                quizObj.questions = matched;
-              }
-            }
-          } catch (e) {}
-        }
-
         setQuiz(quizObj);
       } catch (err) {
         setError(err.message);

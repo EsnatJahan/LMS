@@ -95,6 +95,12 @@ export default function CourseDetails() {
 
         // 3. If logged in, check enrollment, lesson progress, and quiz results
         if (jwt && parsedUser) {
+          const userRole = parsedUser?.role?.name;
+          const isStaff = userRole === "Admin" || userRole === "Instructor" || userRole === "Content Manager";
+
+          const courseKey = courseObj.documentId || courseObj.id || id;
+          const localEnrolled = typeof window !== "undefined" && localStorage.getItem(`enrolled_${courseKey}`) === "true";
+
           // Check Enrollment
           const enrollRes = await fetch(
             `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/enrollments?populate=*`,
@@ -104,14 +110,19 @@ export default function CourseDetails() {
           const enrolledList = enrollData?.data || [];
           
           const isUserEnrolled = enrolledList.some((enr) => {
+          const isUserEnrolled = isStaff || localEnrolled || enrolledList.some((enr) => {
             const u = enr.users_permissions_user;
             const c = enr.course;
             if (!u || !c) return false;
+            if (!c) return false;
             
             const matchUser =
+              !u ||
               u.id === parsedUser.id ||
               u.documentId === parsedUser.documentId ||
               u.username === parsedUser.username;
+              u.username === parsedUser.username ||
+              (u.email && parsedUser.email && u.email.toLowerCase() === parsedUser.email.toLowerCase());
 
             const matchCourse =
               c.id === courseObj.id ||
@@ -119,11 +130,17 @@ export default function CourseDetails() {
               c.documentId === id ||
               String(c.id) === String(id) ||
               c.title === courseObj.title;
+              (c.title && courseObj.title && c.title.trim().toLowerCase() === courseObj.title.trim().toLowerCase());
 
             return matchUser && matchCourse;
           });
 
           setIsEnrolled(isUserEnrolled);
+          if (isUserEnrolled) {
+            try {
+              localStorage.setItem(`enrolled_${courseKey}`, "true");
+            } catch (e) {}
+          }
 
           // Check Lesson Progresses
           if (isUserEnrolled) {
@@ -239,6 +256,10 @@ export default function CourseDetails() {
       }
 
       toast.success("Successfully enrolled in this course! You now have full access to all lessons.");
+      const courseKey = course.documentId || course.id || id;
+      try {
+        localStorage.setItem(`enrolled_${courseKey}`, "true");
+      } catch (e) {}
       setIsEnrolled(true);
     } catch (error) {
       console.error("ENROLL ERROR:", error);

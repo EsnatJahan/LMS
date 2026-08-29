@@ -2,6 +2,30 @@ import { factories } from '@strapi/strapi';
 
 export default factories.createCoreController('api::enrollment.enrollment', ({ strapi }) => ({
   
+  async find(ctx) {
+    const user = ctx.state.user;
+    if (!user) return super.find(ctx);
+
+    const fullUser: any = await strapi.entityService.findOne('plugin::users-permissions.user', user.id, {
+      populate: ['role'],
+    });
+    const roleName = fullUser?.role?.name;
+
+    let enrollments: any[] = [];
+    if (roleName === 'Student' || roleName === 'Authenticated') {
+      enrollments = await strapi.db.query('api::enrollment.enrollment').findMany({
+        where: { users_permissions_user: user.id },
+        populate: ['course', 'users_permissions_user'],
+      });
+    } else {
+      enrollments = await strapi.db.query('api::enrollment.enrollment').findMany({
+        populate: ['course', 'users_permissions_user'],
+      });
+    }
+
+    return ctx.send({ data: enrollments });
+  },
+
   async create(ctx) {
     const user = ctx.state.user;
     if (!user) return ctx.unauthorized('You must be logged in.');
