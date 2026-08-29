@@ -3,10 +3,60 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useToast } from "../../components/Toast";
+
+function parseQuestionOptions(question) {
+  if (!question) return [];
+
+  // 1. Direct array of options
+  if (Array.isArray(question.options)) {
+    return question.options.map((opt) => (typeof opt === "object" && opt !== null ? opt.text || opt.title || opt.value || JSON.stringify(opt) : String(opt))).filter(Boolean);
+  }
+
+  // 2. Stringified JSON array or comma-separated string
+  if (typeof question.options === "string") {
+    try {
+      const parsed = JSON.parse(question.options);
+      if (Array.isArray(parsed)) {
+        return parsed.map((opt) => (typeof opt === "object" && opt !== null ? opt.text || opt.title || opt.value || JSON.stringify(opt) : String(opt))).filter(Boolean);
+      }
+      if (typeof parsed === "object" && parsed !== null) {
+        return Object.values(parsed).map(String).filter(Boolean);
+      }
+    } catch (e) {
+      if (question.options.includes(",")) {
+        return question.options.split(",").map((s) => s.trim()).filter(Boolean);
+      }
+      if (question.options.trim()) {
+        return [question.options.trim()];
+      }
+    }
+  }
+
+  // 3. Object with keys
+  if (typeof question.options === "object" && question.options !== null) {
+    return Object.values(question.options).map(String).filter(Boolean);
+  }
+
+  // 4. Individual option properties (option1, option2, option3, option4, etc.)
+  const discrete = [
+    question.option1 || question.option_1 || question.optionA || question.a,
+    question.option2 || question.option_2 || question.optionB || question.b,
+    question.option3 || question.option_3 || question.optionC || question.c,
+    question.option4 || question.option_4 || question.optionD || question.d,
+  ].filter(Boolean);
+
+  if (discrete.length > 0) {
+    return discrete.map(String);
+  }
+
+  return [];
+}
 
 export default function QuizTakingPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,7 +70,7 @@ export default function QuizTakingPage() {
       try {
         const jwt = localStorage.getItem("jwt");
         if (!jwt || jwt === "undefined" || jwt === "null") {
-          alert("Please login first to take the quiz.");
+          toast.info("Please log in first to take the quiz.");
           router.push("/login");
           return;
         }
@@ -64,6 +114,33 @@ export default function QuizTakingPage() {
           throw new Error("Quiz not found or is not yet published.");
         }
 
+        // 3. Ensure all questions are populated
+        if (!quizObj.questions || quizObj.questions.length === 0) {
+          try {
+            const qRes = await fetch(
+              `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/questions?populate=*`,
+              { headers: { Authorization: `Bearer ${jwt}` } }
+            );
+            if (qRes.ok) {
+              const qData = await qRes.json();
+              const matched = (qData.data || []).filter((item) => {
+                const qz = item.quiz;
+                return (
+                  qz &&
+                  (qz.id === quizObj.id ||
+                    qz.documentId === quizObj.documentId ||
+                    qz.documentId === id ||
+                    String(qz.id) === String(id) ||
+                    qz.title === quizObj.title)
+                );
+              });
+              if (matched.length > 0) {
+                quizObj.questions = matched;
+              }
+            }
+          } catch (e) {}
+        }
+
         setQuiz(quizObj);
       } catch (err) {
         setError(err.message);
@@ -73,16 +150,18 @@ export default function QuizTakingPage() {
     }
 
     if (id) loadQuiz();
-  }, [id, router]);
+  }, [id, router, toast]);
 
   function handleSelectOption(question, option) {
-    const qId = typeof question === "object" ? question.id : question;
-    const qDocId = typeof question === "object" ? question.documentId : null;
+    const qId = question?.id;
+    const qDocId = question?.documentId;
+    const qTitle = question?.title;
 
     setSelectedAnswers((prev) => {
       const next = { ...prev };
       if (qId) next[qId] = option;
       if (qDocId) next[qDocId] = option;
+      if (qTitle) next[qTitle] = option;
       return next;
     });
   }
@@ -322,8 +401,11 @@ export default function QuizTakingPage() {
               </div>
             ) : (
               questions.map((question, qIdx) => {
-                const options = Array.isArray(question.options) ? question.options : [];
-                const currentAnswer = selectedAnswers[question.id] || selectedAnswers[question.documentId];
+                const options = parseQuestionOptions(question);
+                const currentAnswer =
+                  selectedAnswers[question.id] ||
+                  selectedAnswers[question.documentId] ||
+                  selectedAnswers[question.title];
 
                 return (
                   <div
