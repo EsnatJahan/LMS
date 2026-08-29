@@ -1,0 +1,10 @@
+frontend
+backend/node_modules
+backend/.tmp
+backend/dist
+backend/build
+backend/.strapi
+.git
+.env
+backend/.env
+
