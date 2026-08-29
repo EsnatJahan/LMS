@@ -56,7 +56,7 @@ export default {
       });
 
       // Issue JWT
-      const jwt = (strapi.plugin('users-permissions') as any).service('jwt').issue({
+      const jwt = await (strapi.plugin('users-permissions') as any).service('jwt').issue({
         id: newUser.id,
       });
 
@@ -109,7 +109,7 @@ export default {
         return ctx.badRequest('Invalid identifier or password.');
       }
 
-      const jwt = (strapi.plugin('users-permissions') as any).service('jwt').issue({
+      const jwt = await (strapi.plugin('users-permissions') as any).service('jwt').issue({
         id: user.id,
       });
 

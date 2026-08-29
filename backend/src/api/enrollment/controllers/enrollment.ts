@@ -11,7 +11,7 @@ export default factories.createCoreController('api::enrollment.enrollment', ({ s
       populate: ['role'],
     });
     
-    if (fullUser.role?.name !== 'Student') {
+    if (fullUser.role?.name && fullUser.role?.name !== 'Student' && fullUser.role?.name !== 'Authenticated') {
       return ctx.forbidden('Only students can enroll in courses.');
     }
 
@@ -21,30 +21,41 @@ export default factories.createCoreController('api::enrollment.enrollment', ({ s
     }
 
     // 1. BULLETPROOF ID CHECK: Find the real course whether frontend sent an ID or a documentId string
-    const matchingCourses: any = await strapi.entityService.findMany('api::course.course', {
-      filters: {
-        $or: [
-          { id: data.course }, // If frontend sent numeric ID
-          { documentId: data.course } // If frontend sent Strapi v5 documentId
-        ]
-      }
-    });
+    let foundCourse: any = null;
+    const courseParam = data.course;
 
-    if (matchingCourses.length === 0) {
+    if (typeof courseParam === 'number' || (!isNaN(Number(courseParam)) && /^\d+$/.test(String(courseParam)))) {
+      foundCourse = await strapi.db.query('api::course.course').findOne({
+        where: { id: parseInt(String(courseParam)) },
+      });
+    }
+
+    if (!foundCourse && typeof courseParam === 'string') {
+      foundCourse = await strapi.db.query('api::course.course').findOne({
+        where: { documentId: courseParam },
+      });
+    }
+
+    if (!foundCourse) {
       return ctx.badRequest('Course not found in the database.');
     }
 
-    const realCourseId = matchingCourses[0].id; // We now have the guaranteed numeric ID
+    const realCourseId = foundCourse.id;
 
-    // 2. Check if already enrolled
-    const existingEnrollments: any = await strapi.entityService.findMany('api::enrollment.enrollment', {
-      filters: {
+    // 2. Check if already enrolled across any version of this course
+    const allCourseVersions = await strapi.db.query('api::course.course').findMany({
+      where: { documentId: foundCourse.documentId },
+    });
+    const courseIds = allCourseVersions.map((c: any) => c.id);
+
+    const existingEnrollments = await strapi.db.query('api::enrollment.enrollment').findMany({
+      where: {
         users_permissions_user: user.id,
-        course: realCourseId,
+        course: { $in: courseIds },
       },
     });
 
-    if (existingEnrollments.length > 0) {
+    if (existingEnrollments && existingEnrollments.length > 0) {
       return ctx.badRequest('You are already enrolled in this course.');
     }
 

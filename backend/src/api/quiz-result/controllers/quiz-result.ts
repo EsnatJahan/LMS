@@ -56,9 +56,9 @@ export default factories.createCoreController('api::quiz-result.quiz-result', ({
       // 3. Compute Auto-Graded Score
       let score = 0;
       const breakdown = questions.map((q: any) => {
-        const studentAns = answers[q.id] || answers[q.documentId] || '';
+        const studentAns = answers[q.id] || answers[q.documentId] || answers[String(q.id)] || answers[q.title] || '';
         const correctAns = q.correctAnswer || '';
-        const isCorrect = studentAns.toString().trim().toLowerCase() === correctAns.toString().trim().toLowerCase();
+        const isCorrect = Boolean(studentAns && correctAns && studentAns.toString().trim().toLowerCase() === correctAns.toString().trim().toLowerCase());
 
         if (isCorrect) {
           score++;

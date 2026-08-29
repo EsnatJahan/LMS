@@ -8,7 +8,7 @@ export default function Dashboard() {
   const router = useRouter();
 
   const [user, setUser] = useState(null);
-  const [enrollments, setEnrollments] = useState([]);
+  const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [courseProgressMap, setCourseProgressMap] = useState({});
   const [quizResults, setQuizResults] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,7 +20,7 @@ export default function Dashboard() {
         const storedUser = localStorage.getItem("user");
         const jwt = localStorage.getItem("jwt");
 
-        if (!storedUser || !jwt) {
+        if (!storedUser || !jwt || jwt === "undefined" || jwt === "null") {
           router.push("/login");
           return;
         }
@@ -28,52 +28,115 @@ export default function Dashboard() {
         const currentUser = JSON.parse(storedUser);
         setUser(currentUser);
 
-        // 1. Fetch Enrollments with course & lessons
-        const enrollRes = await fetch(
-          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/enrollments?filters[users_permissions_user][id][$eq]=${currentUser.id}&populate[course][populate]=lessons`,
-          { headers: { Authorization: `Bearer ${jwt}` } }
-        );
+        // Fetch Enrollments, Courses, Lesson Progresses, and Quiz Results in parallel
+        const [enrollRes, coursesRes, progRes, quizRes] = await Promise.all([
+          fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/enrollments?populate=*`, {
+            headers: { Authorization: `Bearer ${jwt}` },
+          }),
+          fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/courses?populate=*`),
+          fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/lesson-progresses?populate=*`, {
+            headers: { Authorization: `Bearer ${jwt}` },
+          }),
+          fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/quiz-results?populate=*&sort=createdAt:desc`, {
+            headers: { Authorization: `Bearer ${jwt}` },
+          }),
+        ]);
 
         const enrollData = await enrollRes.json();
-        const enrollList = enrollData.data || [];
-        setEnrollments(enrollList);
-
-        // 2. Fetch all lesson progresses for this student
-        const progRes = await fetch(
-          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/lesson-progresses?filters[users_permissions_user][id][$eq]=${currentUser.id}&populate[lesson]=*&populate[course]=*`,
-          { headers: { Authorization: `Bearer ${jwt}` } }
-        );
+        const coursesData = await coursesRes.json();
         const progData = await progRes.json();
-        const progresses = progData?.data || [];
+        const quizData = await quizRes.json();
 
-        // Build progress map per course
+        const allEnrollments = enrollData?.data || [];
+        const allCourses = coursesData?.data || [];
+        const allProgresses = progData?.data || [];
+        const allQuizResults = quizData?.data || [];
+
+        // 1. Filter student's enrollments
+        const studentEnrollments = allEnrollments.filter((enr) => {
+          const u = enr.users_permissions_user;
+          return (
+            u &&
+            (u.id === currentUser.id ||
+              u.documentId === currentUser.documentId ||
+              u.username === currentUser.username)
+          );
+        });
+
+        // 2. Map to distinct Courses
+        const enrolledCourseMap = new Map();
+        studentEnrollments.forEach((enr) => {
+          let c = enr.course;
+          if (c) {
+            // Find full course with lessons from allCourses
+            const fullCourse = allCourses.find(
+              (item) => item.documentId === c.documentId || item.id === c.id || item.title === c.title
+            ) || c;
+
+            const courseKey = fullCourse.documentId || fullCourse.id || fullCourse.title;
+            if (!enrolledCourseMap.has(courseKey)) {
+              enrolledCourseMap.set(courseKey, fullCourse);
+            }
+          }
+        });
+
+        const distinctCourses = Array.from(enrolledCourseMap.values());
+        setEnrolledCourses(distinctCourses);
+
+        // 3. Filter student's lesson progresses
+        const studentProgresses = allProgresses.filter((p) => {
+          const u = p.users_permissions_user;
+          return (
+            p.completed &&
+            (!u ||
+              u.id === currentUser.id ||
+              u.documentId === currentUser.documentId ||
+              u.username === currentUser.username)
+          );
+        });
+
+        // 4. Calculate progress percentage per enrolled course
         const progMap = {};
-        enrollList.forEach((enr) => {
-          const course = enr.course;
-          if (!course) return;
+        distinctCourses.forEach((course) => {
+          const courseLessons = course.lessons || [];
+          const totalLessons = courseLessons.length;
 
-          const totalLessons = course.lessons?.length || 0;
-          const completedInThisCourse = progresses.filter(
-            (p) => (p.course?.id === course.id || p.course?.documentId === course.documentId) && p.completed
-          ).length;
+          let completedCount = 0;
+          courseLessons.forEach((lesson) => {
+            const isCompleted = studentProgresses.some((p) => {
+              const pLesson = p.lesson;
+              return (
+                pLesson &&
+                (pLesson.id === lesson.id ||
+                  pLesson.documentId === lesson.documentId ||
+                  String(pLesson.id) === String(lesson.id))
+              );
+            });
+            if (isCompleted) completedCount++;
+          });
 
-          const percent = totalLessons > 0 ? Math.round((completedInThisCourse / totalLessons) * 100) : 0;
+          const percent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+          const courseKey = course.documentId || course.id;
 
-          progMap[course.id] = {
-            completed: completedInThisCourse,
+          progMap[courseKey] = {
+            completed: completedCount,
             total: totalLessons,
             percentage: percent,
           };
         });
         setCourseProgressMap(progMap);
 
-        // 3. Fetch Quiz Results
-        const quizRes = await fetch(
-          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/quiz-results?filters[users_permissions_user][id][$eq]=${currentUser.id}&populate[quiz]=*&sort=createdAt:desc`,
-          { headers: { Authorization: `Bearer ${jwt}` } }
-        );
-        const quizData = await quizRes.json();
-        setQuizResults(quizData?.data || []);
+        // 5. Filter student's quiz results
+        const studentQuizzes = allQuizResults.filter((r) => {
+          const u = r.users_permissions_user;
+          return (
+            !u ||
+            u.id === currentUser.id ||
+            u.documentId === currentUser.documentId ||
+            u.username === currentUser.username
+          );
+        });
+        setQuizResults(studentQuizzes);
 
       } catch (err) {
         setError(err.message);
@@ -123,22 +186,22 @@ export default function Dashboard() {
               Welcome back, {user.username}!
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              Track your enrolled courses, lesson progress, and quiz assessments.
+              Track your enrolled courses, lesson completion, and quiz assessments.
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <Link
               href="/"
-              className="rounded-lg bg-black px-4 py-2.5 text-sm font-bold text-white hover:bg-gray-800 transition"
+              className="rounded-lg bg-black px-4 py-2.5 text-sm font-bold text-white hover:bg-gray-800 transition shadow-sm"
             >
-              Browse All Courses
+              Browse Catalog
             </Link>
 
             {isAdmin && (
               <Link
                 href="/admin"
-                className="rounded-lg bg-purple-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-purple-800 transition"
+                className="rounded-lg bg-purple-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-purple-800 transition shadow-sm"
               >
                 ⚡ Admin Panel
               </Link>
@@ -147,7 +210,7 @@ export default function Dashboard() {
             {(isInstructor || isContentManager) && (
               <Link
                 href="/manage/courses"
-                className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 transition"
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 hover:bg-gray-50 transition shadow-sm"
               >
                 📚 Manage Courses
               </Link>
@@ -165,11 +228,11 @@ export default function Dashboard() {
         <section className="mb-12">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-              My Enrolled Courses ({enrollments.length})
+              My Enrolled Courses ({enrolledCourses.length})
             </h2>
           </div>
 
-          {enrollments.length === 0 ? (
+          {enrolledCourses.length === 0 ? (
             <div className="rounded-2xl bg-white p-10 text-center text-gray-500 border border-gray-100 max-w-md mx-auto">
               <div className="text-4xl mb-2">📚</div>
               <h3 className="font-bold text-gray-800 text-lg">No enrolled courses yet</h3>
@@ -178,22 +241,20 @@ export default function Dashboard() {
               </p>
               <Link
                 href="/"
-                className="rounded-lg bg-black px-4 py-2 text-sm font-bold text-white hover:bg-gray-800"
+                className="rounded-lg bg-black px-5 py-2.5 text-sm font-bold text-white hover:bg-gray-800 transition"
               >
                 Browse Catalog →
               </Link>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {enrollments.map((enrollment) => {
-                const course = enrollment.course;
-                if (!course) return null;
-
-                const prog = courseProgressMap[course.id] || { completed: 0, total: 0, percentage: 0 };
+              {enrolledCourses.map((course) => {
+                const courseKey = course.documentId || course.id;
+                const prog = courseProgressMap[courseKey] || { completed: 0, total: 0, percentage: 0 };
 
                 return (
                   <div
-                    key={enrollment.documentId || enrollment.id}
+                    key={courseKey}
                     className="rounded-2xl bg-white p-6 shadow-sm border border-gray-200 flex flex-col justify-between"
                   >
                     <div>
@@ -202,7 +263,7 @@ export default function Dashboard() {
                           Course
                         </span>
                         <span className="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded">
-                          Enrolled
+                          Enrolled ✅
                         </span>
                       </div>
 
@@ -219,7 +280,7 @@ export default function Dashboard() {
                       <div>
                         <div className="flex items-center justify-between text-xs font-semibold text-gray-600 mb-1.5">
                           <span>Progress: {prog.completed} / {prog.total} lessons</span>
-                          <span>{prog.percentage}%</span>
+                          <span className="font-bold text-gray-900">{prog.percentage}%</span>
                         </div>
                         <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                           <div
@@ -233,7 +294,7 @@ export default function Dashboard() {
 
                       <Link
                         href={`/courses/${course.documentId || course.id}`}
-                        className="block w-full text-center rounded-lg bg-black py-2.5 text-xs font-bold text-white hover:bg-gray-800 transition"
+                        className="block w-full text-center rounded-lg bg-black py-2.5 text-xs font-bold text-white hover:bg-gray-800 transition shadow-sm"
                       >
                         {prog.completed > 0 ? "Continue Learning →" : "Start Course →"}
                       </Link>
@@ -269,13 +330,13 @@ export default function Dashboard() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {quizResults.map((r) => {
-                    const pct = r.total > 0 ? Math.round((r.score / r.total) * 100) : 0;
-                    const passed = pct >= 60;
+                    const pct = r.total > 0 ? Math.round((r.score / r.total) * 100) : (r.percentage || 0);
+                    const passed = r.passed !== undefined ? r.passed : pct >= 60;
 
                     return (
                       <tr key={r.id}>
                         <td className="py-3 px-4 font-bold text-gray-900">
-                          {r.quiz?.title || "Quiz"}
+                          {r.quiz?.title || r.quizTitle || "MCQ Quiz"}
                         </td>
                         <td className="py-3 px-4 font-semibold text-gray-800">
                           {r.score} / {r.total}

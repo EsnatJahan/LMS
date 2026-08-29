@@ -48,10 +48,13 @@ export default function QuizTakingPage() {
     if (id) loadQuiz();
   }, [id, router]);
 
-  function handleSelectOption(questionId, option) {
+  function handleSelectOption(question, option) {
+    const qId = typeof question === 'object' ? question.id : question;
+    const qDocId = typeof question === 'object' ? question.documentId : question;
     setSelectedAnswers((prev) => ({
       ...prev,
-      [questionId]: option,
+      [qId]: option,
+      ...(qDocId ? { [qDocId]: option } : {}),
     }));
   }
 
@@ -296,7 +299,7 @@ export default function QuizTakingPage() {
                         return (
                           <label
                             key={oIdx}
-                            onClick={() => handleSelectOption(question.id, option)}
+                            onClick={() => handleSelectOption(question, option)}
                             className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition text-sm ${
                               isSelected
                                 ? "bg-indigo-50/50 border-indigo-600 ring-1 ring-indigo-600 text-indigo-950 font-semibold"
@@ -308,7 +311,7 @@ export default function QuizTakingPage() {
                               name={`question-${question.id}`}
                               value={option}
                               checked={isSelected}
-                              onChange={() => handleSelectOption(question.id, option)}
+                              onChange={() => handleSelectOption(question, option)}
                               className="accent-indigo-600 w-4 h-4"
                             />
                             <span>{option}</span>

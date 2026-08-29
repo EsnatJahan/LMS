@@ -19,25 +19,35 @@ export default function LessonPage() {
   useEffect(() => {
     async function fetchLessonAndData() {
       try {
+        // 1. Fetch current lesson with populate=*
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/lessons/${params.id}?populate[course][populate]=lessons`
+          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/lessons/${params.id}?populate=*`
         );
 
         const data = await response.json();
 
-        if (!response.ok) {
+        if (!response.ok || !data.data) {
           throw new Error("Failed to load lesson");
         }
 
         const lessonData = data.data;
         setLesson(lessonData);
 
-        // Sort all lessons in the course for sequential navigation
-        const rawLessons = lessonData.course?.lessons || [];
-        const sortedLessons = [...rawLessons].sort((a, b) => (a.order || 0) - (b.order || 0));
-        setCourseLessons(sortedLessons);
+        // 2. Fetch sibling lessons from the parent course for sequential navigation
+        if (lessonData.course) {
+          const courseId = lessonData.course.documentId || lessonData.course.id;
+          const courseRes = await fetch(
+            `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/courses/${courseId}?populate=*`
+          );
+          const courseData = await courseRes.json();
+          if (courseData?.data?.lessons) {
+            const rawLessons = courseData.data.lessons;
+            const sortedLessons = [...rawLessons].sort((a, b) => (a.order || 0) - (b.order || 0));
+            setCourseLessons(sortedLessons);
+          }
+        }
 
-        // Check if user has already completed this lesson
+        // 3. Check if user has already completed this lesson
         const jwt = localStorage.getItem("jwt");
         const userStr = localStorage.getItem("user");
 
@@ -90,8 +100,8 @@ export default function LessonPage() {
         },
         body: JSON.stringify({
           data: {
-            lesson: lesson.id || lesson.documentId,
-            course: lesson.course?.id || lesson.course?.documentId, 
+            lesson: lesson.documentId || lesson.id,
+            course: lesson.course?.documentId || lesson.course?.id, 
             completed: true
           },
         }),
@@ -114,7 +124,6 @@ export default function LessonPage() {
     }
   };
 
-  // Convert YouTube link to embed URL if applicable
   function getEmbedVideoUrl(url) {
     if (!url) return null;
     try {
@@ -139,14 +148,17 @@ export default function LessonPage() {
     );
   }
 
-  if (error) {
+  if (error || !lesson) {
     return (
       <main className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
-        <div className="text-center bg-white p-8 rounded-xl shadow border border-red-100 max-w-md">
-          <div className="text-3xl mb-2">⚠️</div>
-          <h2 className="text-lg font-bold text-red-600 mb-2">Error Loading Lesson</h2>
-          <p className="text-sm text-gray-600 mb-4">{error}</p>
-          <Link href="/" className="text-sm font-bold text-black underline">
+        <div className="text-center bg-white p-8 rounded-2xl shadow border border-gray-100 max-w-md">
+          <div className="text-4xl mb-2">🔍</div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Lesson Not Found</h2>
+          <p className="text-xs text-gray-500 mb-6">{error || "The lesson you are looking for does not exist."}</p>
+          <Link
+            href="/"
+            className="rounded-lg bg-black px-5 py-2.5 text-sm font-bold text-white hover:bg-gray-800"
+          >
             ← Return to Courses
           </Link>
         </div>
@@ -154,21 +166,6 @@ export default function LessonPage() {
     );
   }
 
-  if (!lesson) {
-    return (
-      <main className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
-        <div className="text-center bg-white p-8 rounded-xl shadow border border-gray-100">
-          <div className="text-3xl mb-2">🔍</div>
-          <h2 className="text-lg font-bold text-gray-900 mb-2">Lesson Not Found</h2>
-          <Link href="/" className="text-sm font-bold text-black underline">
-            ← Return to Courses
-          </Link>
-        </div>
-      </main>
-    );
-  }
-
-  // Calculate Sequential Navigation (Previous / Next)
   const currentIndex = courseLessons.findIndex(
     (l) => l.id === lesson.id || l.documentId === lesson.documentId
   );
@@ -204,7 +201,7 @@ export default function LessonPage() {
             {lesson.title}
           </h1>
 
-          {/* Embedded Video Player (if videoUrl is present) */}
+          {/* Video Player */}
           {embedUrl && (
             <div className="mt-8 rounded-xl overflow-hidden shadow bg-black aspect-video">
               {embedUrl.includes("youtube.com") ? (
@@ -225,7 +222,7 @@ export default function LessonPage() {
           )}
 
           {/* Text Content */}
-          <div className="mt-8 text-base text-gray-700 leading-relaxed whitespace-pre-wrap font-normal">
+          <div className="mt-8 text-base text-gray-800 leading-relaxed whitespace-pre-wrap font-normal">
             {lesson.content}
           </div>
 
@@ -252,7 +249,7 @@ export default function LessonPage() {
 
         </article>
 
-        {/* Sequential Navigation (Previous / Next Lesson) */}
+        {/* Sequential Navigation */}
         <div className="mt-8 flex items-center justify-between gap-4">
           {previousLesson ? (
             <Link
