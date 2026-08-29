@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: lms-backend
+    env: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATABASE_CLIENT
+        value: sqlite
+      - key: DATABASE_FILENAME
+        value: .tmp/data.db
+      - key: APP_KEYS
+        value: HmPtFDjojMVNYQGcXgLBCQ==,2pa5JBuamkHoozs+6K7CeQ==,zalCgWdtq0VOsiiwJpj3Hw==,HRxRNEQS7aV+MJrMW6258g==
+      - key: API_TOKEN_SALT
+        value: FRFyoyvGjIWyNl0oAT7Zsg==
+      - key: ADMIN_JWT_SECRET
+        value: YXxhPLCJKaX1WRgZqRyfmw==
+      - key: JWT_SECRET
+        value: HbgJ+ZSH7Wh2WeEqu2eefQ==
+      - key: TRANSFER_TOKEN_SALT
+        value: TXh46VquGVXVztWBMifnkg==
+      - key: ENCRYPTION_KEY
+        value: OCkc5Dvqb7fyfOmswUkO8g==
+

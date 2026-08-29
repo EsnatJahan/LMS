@@ -12,8 +12,9 @@ export default function LandingPage() {
   useEffect(() => {
     async function fetchCourses() {
       try {
+        const strapiUrl = process.env.NEXT_PUBLIC_STRAPI_URL || "http://localhost:1337";
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/courses?populate=*`
+          `${strapiUrl}/api/courses?populate=*`
         );
         const data = await response.json();
         if (response.ok) {
