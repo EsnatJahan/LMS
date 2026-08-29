@@ -42,16 +42,31 @@ export default factories.createCoreController('api::quiz-result.quiz-result', ({
       const realQuiz = matchingQuizzes[0];
       const realQuizId = realQuiz.id;
 
-      // 2. Fetch all questions for this quiz
-      const questions: any = await strapi.entityService.findMany('api::question.question', {
-        filters: {
-          quiz: realQuizId,
+      // 2. Fetch all questions for this quiz and deduplicate by documentId
+      const allQuizRows = await strapi.db.query('api::quiz.quiz').findMany({
+        where: { documentId: realQuiz.documentId },
+      });
+      const quizIds = allQuizRows.map((q: any) => q.id);
+
+      const rawQuestions: any = await strapi.db.query('api::question.question').findMany({
+        where: {
+          quiz: { $in: quizIds },
         },
       });
 
-      if (!questions || questions.length === 0) {
+      if (!rawQuestions || rawQuestions.length === 0) {
         return ctx.badRequest('This quiz has no questions.');
       }
+
+      const qMap = new Map();
+      rawQuestions.forEach((q: any) => {
+        const key = q.documentId || q.id || q.title;
+        const existing = qMap.get(key);
+        if (!existing || (!existing.publishedAt && q.publishedAt)) {
+          qMap.set(key, q);
+        }
+      });
+      const questions = Array.from(qMap.values());
 
       // 3. Compute Auto-Graded Score
       let score = 0;

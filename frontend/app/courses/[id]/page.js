@@ -35,12 +35,16 @@ export default function CourseDetails() {
           setCurrentUser(null);
         }
 
-        // 1. Fetch Course details
-        const courseRes = await fetch(
-          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/courses/${id}?populate=*`
-        );
+        // 1. Fetch Course details and Quizzes in parallel
+        const headers = jwt && jwt !== "undefined" ? { Authorization: `Bearer ${jwt}` } : {};
+        const [courseRes, quizzesRes] = await Promise.all([
+          fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/courses/${id}?populate=*`),
+          fetch(`${process.env.NEXT_PUBLIC_STRAPI_URL}/api/quizzes?populate=*`, { headers }),
+        ]);
+
         const courseData = await courseRes.json();
-        const courseObj = courseData.data;
+        const quizzesData = await quizzesRes.json();
+        const courseObj = courseData?.data;
         setCourse(courseObj);
 
         if (!courseObj) {
@@ -48,29 +52,20 @@ export default function CourseDetails() {
           return;
         }
 
-        // 2. Fetch Quiz for this course
-        const headers = jwt && jwt !== "undefined" ? { Authorization: `Bearer ${jwt}` } : {};
-        const quizRes = await fetch(
-          `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/quizzes?filters[course][documentId][$eq]=${courseObj.documentId || id}&populate=*`,
-          { headers }
-        );
-        const quizData = await quizRes.json();
-        let currentQuiz = null;
-        if (quizRes.ok && quizData?.data && quizData.data.length > 0) {
-          currentQuiz = quizData.data[0];
-          setCourseQuiz(currentQuiz);
-        } else {
-          // Fallback fetch quiz with course id
-          const fallbackQuizRes = await fetch(
-            `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/quizzes?filters[course][id][$eq]=${courseObj.id}&populate=*`,
-            { headers }
+        // 2. Match Quiz for this course
+        const allQuizzes = quizzesData?.data || [];
+        const currentQuiz = allQuizzes.find((q) => {
+          const c = q.course;
+          return (
+            c &&
+            (c.id === courseObj.id ||
+              c.documentId === courseObj.documentId ||
+              c.documentId === id ||
+              String(c.id) === String(id) ||
+              c.title === courseObj.title)
           );
-          const fallbackQuizData = await fallbackQuizRes.json();
-          if (fallbackQuizData?.data && fallbackQuizData.data.length > 0) {
-            currentQuiz = fallbackQuizData.data[0];
-            setCourseQuiz(currentQuiz);
-          }
-        }
+        }) || null;
+        setCourseQuiz(currentQuiz);
 
         // 3. If logged in, check enrollment, lesson progress, and quiz results
         if (jwt && parsedUser) {
