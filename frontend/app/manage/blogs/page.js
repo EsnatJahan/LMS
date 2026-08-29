@@ -3,11 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useToast } from "../../components/Toast";
 
 export default function ManageBlogsPage() {
   const router = useRouter();
-  const { toast } = useToast();
 
   const [currentUser, setCurrentUser] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -120,12 +118,10 @@ export default function ManageBlogsPage() {
       if (!res.ok) throw new Error(data?.error?.message || "Failed to save blog post");
 
       alert(editingPostId ? "Article updated successfully!" : "Article created successfully!");
-      toast.success(editingPostId ? "Article updated successfully!" : "Article created successfully!");
       setShowModal(false);
       await fetchPosts();
     } catch (err) {
       alert(err.message);
-      toast.error(err.message);
     } finally {
       setSaving(false);
     }
@@ -150,11 +146,9 @@ export default function ManageBlogsPage() {
       });
 
       if (!res.ok) throw new Error("Failed to toggle status");
-      toast.success(`Article ${newStatus === "published" ? "published" : "moved to draft"}!`);
       await fetchPosts();
     } catch (err) {
       alert(err.message);
-      toast.error(err.message);
     }
   }
 
@@ -170,11 +164,9 @@ export default function ManageBlogsPage() {
 
       if (!res.ok) throw new Error("Failed to delete post");
       alert("Post deleted successfully!");
-      toast.success("Post deleted successfully!");
       await fetchPosts();
     } catch (err) {
       alert(err.message);
-      toast.error(err.message);
     }
   }
 

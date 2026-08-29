@@ -3,11 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useToast } from "../components/Toast";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { toast } = useToast();
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -47,7 +45,6 @@ export default function LoginPage() {
       localStorage.setItem("user", JSON.stringify(data.user));
 
       window.dispatchEvent(new Event("authChange"));
-      toast.success(`Welcome back, ${data.user?.username || "User"}!`);
 
       const roleName = data.user?.role?.name;
       if (roleName === "Admin") {
@@ -59,7 +56,6 @@ export default function LoginPage() {
       }
     } catch (error) {
       setError(error.message);
-      toast.error(error.message);
     } finally {
       setLoading(false);
     }

@@ -3,11 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useToast } from "../components/Toast";
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const { toast } = useToast();
 
   const [currentUser, setCurrentUser] = useState(null);
   const [stats, setStats] = useState(null);
@@ -104,11 +102,9 @@ export default function AdminDashboard() {
       );
 
       setSuccessMessage(data.message || `Role updated to ${newRoleName}`);
-      toast.success(data.message || `Role updated to ${newRoleName}`);
       setTimeout(() => setSuccessMessage(""), 4000);
     } catch (err) {
       alert(err.message);
-      toast.error(err.message);
     } finally {
       setUpdatingUserId(null);
     }
@@ -160,15 +156,9 @@ export default function AdminDashboard() {
           ? `Successfully assigned ${assignedUser.username} as instructor.`
           : "Course unassigned from instructor."
       );
-      const msg = assignedUser
-        ? `Successfully assigned ${assignedUser.username} as instructor.`
-        : "Course unassigned from instructor.";
-      setSuccessMessage(msg);
-      toast.success(msg);
       setTimeout(() => setSuccessMessage(""), 4000);
     } catch (err) {
       alert(err.message);
-      toast.error(err.message);
     } finally {
       setUpdatingCourseId(null);
     }

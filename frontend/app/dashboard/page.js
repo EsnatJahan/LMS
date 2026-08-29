@@ -3,11 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useToast } from "../components/Toast";
 
 export default function Dashboard() {
   const router = useRouter();
-  const { toast } = useToast();
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -248,11 +246,9 @@ export default function Dashboard() {
       }
 
       alert("Course deleted successfully!");
-      toast.success("Course deleted successfully!");
       await loadDashboardData();
     } catch (err) {
       alert(err.message);
-      toast.error(err.message);
     }
   }
 
