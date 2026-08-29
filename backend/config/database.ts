@@ -1,4 +1,5 @@
 import path from 'path';
+import fs from 'fs';
 import type { Core } from '@strapi/strapi';
 import { isDatabaseClientKind } from '@strapi/database';
 
@@ -10,6 +11,14 @@ const config = ({ env }: Core.Config.Shared.ConfigParams): Core.Config.Database 
       `Unsupported DATABASE_CLIENT: ${client}. Use "postgres", "mysql", or "sqlite".`
     );
   }
+
+  const sqliteFilename = path.resolve(process.cwd(), env('DATABASE_FILENAME', '.tmp/data.db'));
+  try {
+    const dir = path.dirname(sqliteFilename);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  } catch (e) {}
 
   const connections: Record<Core.Config.Database.ClientKind, Core.Config.Database['connection']> = {
     mysql: {
@@ -55,7 +64,7 @@ const config = ({ env }: Core.Config.Shared.ConfigParams): Core.Config.Database 
     sqlite: {
       client: 'sqlite',
       connection: {
-        filename: path.join(__dirname, '..', '..', env('DATABASE_FILENAME', '.tmp/data.db')),
+        filename: sqliteFilename,
       },
       useNullAsDefault: true,
     },
