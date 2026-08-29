@@ -54,7 +54,7 @@ export default function CourseDetails() {
           return;
         }
 
-        // 2. Match Quiz for this course
+        // 2. Match Quiz for this course and ensure questions are populated
         const allQuizzes = quizzesData?.data || [];
         const currentQuiz = allQuizzes.find((q) => {
           const c = q.course;
@@ -67,6 +67,30 @@ export default function CourseDetails() {
               c.title === courseObj.title)
           );
         }) || null;
+
+        if (currentQuiz && (!currentQuiz.questions || currentQuiz.questions.length === 0)) {
+          try {
+            const qRes = await fetch(
+              `${process.env.NEXT_PUBLIC_STRAPI_URL}/api/questions?populate=*`,
+              { headers }
+            );
+            if (qRes.ok) {
+              const qData = await qRes.json();
+              const matched = (qData.data || []).filter((item) => {
+                const qz = item.quiz;
+                return (
+                  qz &&
+                  (qz.id === currentQuiz.id ||
+                    qz.documentId === currentQuiz.documentId ||
+                    qz.title === currentQuiz.title)
+                );
+              });
+              if (matched.length > 0) {
+                currentQuiz.questions = matched;
+              }
+            }
+          } catch (e) {}
+        }
         setCourseQuiz(currentQuiz);
 
         // 3. If logged in, check enrollment, lesson progress, and quiz results
@@ -494,7 +518,7 @@ export default function CourseDetails() {
                 <p className="text-xs text-gray-600 mt-1 mb-4">{courseQuiz.description}</p>
 
                 <div className="text-xs text-gray-500 font-medium mb-4 space-y-1">
-                  <div>❓ Questions: <strong>{courseQuiz.questions?.length || 4} Questions</strong></div>
+                  <div>❓ Questions: <strong>{courseQuiz.questions?.length !== undefined ? courseQuiz.questions.length : 0} Questions</strong></div>
                   <div>🎯 Passing Grade: <strong>60%</strong></div>
                   <div>⚡ Auto-Grading: <strong>Instant Results</strong></div>
                 </div>
