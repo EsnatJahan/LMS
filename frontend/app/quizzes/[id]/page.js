@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useToast } from "../../components/Toast";
 
 export default function QuizTakingPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [quiz, setQuiz] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -21,6 +23,7 @@ export default function QuizTakingPage() {
         const jwt = localStorage.getItem("jwt");
         if (!jwt || jwt === "undefined" || jwt === "null") {
           alert("Please login first to take the quiz.");
+          toast.info("Please log in first to take the quiz.");
           router.push("/login");
           return;
         }
@@ -133,9 +136,11 @@ export default function QuizTakingPage() {
       }
 
       setQuizResult(data.data);
+      toast.success("Quiz submitted successfully!");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       alert(err.message);
+      toast.error(err.message);
     } finally {
       setSubmitting(false);
     }

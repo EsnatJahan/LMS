@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useToast } from "../../components/Toast";
 
 export default function LessonPage() {
   const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [lesson, setLesson] = useState(null);
   const [courseLessons, setCourseLessons] = useState([]);
@@ -86,6 +88,7 @@ export default function LessonPage() {
     
     if (!jwt) {
       alert("Please login first.");
+      toast.info("Please log in first to track lesson progress.");
       return;
     }
 
@@ -115,10 +118,12 @@ export default function LessonPage() {
       
       setIsCompleted(true);
       alert("Lesson marked as complete! Your course progress has been updated.");
+      toast.success("Lesson marked as complete! Your course progress has been updated.");
       
     } catch (err) {
       console.error("Progress Error:", err);
       alert(err.message);
+      toast.error(err.message);
     } finally {
       setCompleting(false);
     }

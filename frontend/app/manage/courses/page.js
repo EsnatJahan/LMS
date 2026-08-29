@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useToast } from "../../components/Toast";
 
 export default function ManageCoursesPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   const [currentUser, setCurrentUser] = useState(null);
   const [courses, setCourses] = useState([]);
@@ -190,6 +192,7 @@ export default function ManageCoursesPage() {
       if (!res.ok) throw new Error(data?.error?.message || "Failed to create course");
 
       alert("Course created successfully!");
+      toast.success("Course created successfully!");
       setNewTitle("");
       setNewDescription("");
       setSelectedInstructorForNewCourse("");
@@ -197,6 +200,7 @@ export default function ManageCoursesPage() {
       await fetchCourses();
     } catch (err) {
       alert(err.message);
+      toast.error(err.message);
     } finally {
       setCreating(false);
     }
@@ -222,9 +226,11 @@ export default function ManageCoursesPage() {
 
       if (!res.ok) throw new Error("Failed to reassign instructor");
       alert("Course instructor updated successfully!");
+      toast.success("Course instructor updated successfully!");
       await fetchCourses();
     } catch (err) {
       alert(err.message);
+      toast.error(err.message);
     } finally {
       setUpdatingInstructor(false);
     }
@@ -243,6 +249,7 @@ export default function ManageCoursesPage() {
           course.instructor.username === uName);
       if (!isOwner) {
         alert("You can only edit your own courses.");
+        toast.error("You can only edit your own courses.");
         return;
       }
     }
@@ -276,10 +283,12 @@ export default function ManageCoursesPage() {
       if (!res.ok) throw new Error(data?.error?.message || "Failed to update course details");
 
       alert("Course details updated successfully!");
+      toast.success("Course details updated successfully!");
       setShowEditModal(false);
       await fetchCourses();
     } catch (err) {
       alert(err.message);
+      toast.error(err.message);
     } finally {
       setSavingEdit(false);
     }
@@ -299,6 +308,7 @@ export default function ManageCoursesPage() {
           targetCourse.instructor.username === uName);
       if (!isOwner) {
         alert("You can only delete your own courses.");
+        toast.error("You can only delete your own courses.");
         return;
       }
     }
@@ -318,12 +328,14 @@ export default function ManageCoursesPage() {
       }
 
       alert("Course deleted successfully!");
+      toast.success("Course deleted successfully!");
       if (selectedCourse?.id === courseIdentifier || selectedCourse?.documentId === courseIdentifier) {
         setSelectedCourse(null);
       }
       await fetchCourses();
     } catch (err) {
       alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -356,6 +368,7 @@ export default function ManageCoursesPage() {
       if (!res.ok) throw new Error(data?.error?.message || "Failed to add lesson");
 
       alert("Lesson added successfully!");
+      toast.success("Lesson added successfully!");
       setLessonTitle("");
       setLessonContent("");
       setLessonVideoUrl("");
@@ -363,6 +376,7 @@ export default function ManageCoursesPage() {
       await fetchCourses();
     } catch (err) {
       alert(err.message);
+      toast.error(err.message);
     } finally {
       setSavingLesson(false);
     }
@@ -381,9 +395,11 @@ export default function ManageCoursesPage() {
 
       if (!res.ok) throw new Error("Failed to delete lesson");
       alert("Lesson deleted!");
+      toast.success("Lesson deleted successfully!");
       await fetchCourses();
     } catch (err) {
       alert(err.message);
+      toast.error(err.message);
     }
   }
 
@@ -414,11 +430,13 @@ export default function ManageCoursesPage() {
       if (!res.ok) throw new Error(data?.error?.message || "Failed to create quiz");
 
       alert("Quiz created! Now you can add MCQ questions below.");
+      toast.success("Quiz created! Now you can add MCQ questions below.");
       setQuizTitle("");
       setQuizDescription("");
       await fetchCourses();
     } catch (err) {
       alert(err.message);
+      toast.error(err.message);
     } finally {
       setSavingQuiz(false);
     }
@@ -432,12 +450,14 @@ export default function ManageCoursesPage() {
     const options = [option1, option2, option3, option4].filter(Boolean);
     if (options.length < 2) {
       alert("Please provide at least 2 options.");
+      toast.error("Please provide at least 2 options.");
       setSavingQuestion(false);
       return;
     }
 
     if (!correctAnswer) {
       alert("Please designate the correct answer.");
+      toast.error("Please designate the correct answer.");
       setSavingQuestion(false);
       return;
     }
@@ -466,6 +486,7 @@ export default function ManageCoursesPage() {
       if (!res.ok) throw new Error(data?.error?.message || "Failed to add question");
 
       alert("Question added to quiz successfully!");
+      toast.success("Question added to quiz successfully!");
       setQuestionTitle("");
       setOption1("");
       setOption2("");
@@ -475,6 +496,7 @@ export default function ManageCoursesPage() {
       await fetchCourses();
     } catch (err) {
       alert(err.message);
+      toast.error(err.message);
     } finally {
       setSavingQuestion(false);
     }
@@ -497,9 +519,11 @@ export default function ManageCoursesPage() {
       }
 
       alert("Question deleted successfully!");
+      toast.success("Question deleted successfully!");
       await fetchCourses();
     } catch (err) {
       alert(err.message);
+      toast.error(err.message);
     }
   }
 

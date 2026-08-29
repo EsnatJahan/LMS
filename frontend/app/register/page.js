@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useToast } from "../components/Toast";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { toast } = useToast();
 
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -45,9 +47,11 @@ export default function RegisterPage() {
       localStorage.setItem("user", JSON.stringify(data.user));
 
       window.dispatchEvent(new Event("authChange"));
+      toast.success(`Account created successfully! Welcome, ${data.user?.username || "Student"}!`);
       router.push("/dashboard");
     } catch (error) {
       setError(error.message);
+      toast.error(error.message);
     } finally {
       setLoading(false);
     }

@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "../components/Toast";
 
 export default function CreateCourse() {
   const router = useRouter();
+  const { toast } = useToast();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -17,6 +19,7 @@ async function handleSubmit(e) {
 
     if (!jwt) {
       alert("Please login first.");
+      toast.info("Please log in first.");
       return;
     }
 
@@ -49,12 +52,14 @@ async function handleSubmit(e) {
     }
 
     alert("Course created successfully!");
+    toast.success("Course created successfully!");
 
     setTitle("");
     setDescription("");
   } catch (error) {
     console.error("CREATE COURSE ERROR:", error);
     alert(error.message);
+    toast.error(error.message);
   }
 }
 
