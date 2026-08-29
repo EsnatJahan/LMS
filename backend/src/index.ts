@@ -1,51 +1,193 @@
 import type { Core } from '@strapi/strapi';
 
 export default {
-  /**
-   * An asynchronous register function that runs before
-   * your application is initialized.
-   *
-   * This gives you an opportunity to extend code.
-   */
   register(/* { strapi }: { strapi: Core.Strapi } */) {},
 
-  /**
-   * An asynchronous bootstrap function that runs before
-   * your application gets started.
-   *
-   * This gives you an opportunity to set up your data model,
-   * run jobs, or perform some special logic.
-   */
   async bootstrap({ strapi }: { strapi: Core.Strapi }) {
     try {
-      const actions = [
-        'api::lesson-progress.lesson-progress.find',
-        'api::lesson-progress.lesson-progress.findOne',
-        'api::lesson-progress.lesson-progress.create',
-        'api::lesson-progress.lesson-progress.update',
-        'api::lesson-progress.lesson-progress.delete',
-        'api::lesson.lesson.find',
-        'api::lesson.lesson.findOne',
-        'api::course.course.find',
-        'api::course.course.findOne',
-        'api::enrollment.enrollment.find',
-        'api::enrollment.enrollment.findOne',
-        'api::enrollment.enrollment.create',
-      ];
+      const permissionsConfig: Record<string, string[]> = {
+        Admin: [
+          'api::admin.admin.stats',
+          'api::admin.admin.users',
+          'api::admin.admin.updateRole',
+          'api::auth.auth.me',
+          'api::course.course.find',
+          'api::course.course.findOne',
+          'api::course.course.create',
+          'api::course.course.update',
+          'api::course.course.delete',
+          'api::lesson.lesson.find',
+          'api::lesson.lesson.findOne',
+          'api::lesson.lesson.create',
+          'api::lesson.lesson.update',
+          'api::lesson.lesson.delete',
+          'api::quiz.quiz.find',
+          'api::quiz.quiz.findOne',
+          'api::quiz.quiz.create',
+          'api::quiz.quiz.update',
+          'api::quiz.quiz.delete',
+          'api::question.question.find',
+          'api::question.question.findOne',
+          'api::question.question.create',
+          'api::question.question.update',
+          'api::question.question.delete',
+          'api::quiz-result.quiz-result.find',
+          'api::quiz-result.quiz-result.findOne',
+          'api::quiz-result.quiz-result.create',
+          'api::quiz-result.quiz-result.submit',
+          'api::lesson-progress.lesson-progress.find',
+          'api::lesson-progress.lesson-progress.findOne',
+          'api::lesson-progress.lesson-progress.create',
+          'api::lesson-progress.lesson-progress.update',
+          'api::lesson-progress.lesson-progress.delete',
+          'api::blog-post.blog-post.find',
+          'api::blog-post.blog-post.findOne',
+          'api::blog-post.blog-post.create',
+          'api::blog-post.blog-post.update',
+          'api::blog-post.blog-post.delete',
+          'api::enrollment.enrollment.find',
+          'api::enrollment.enrollment.findOne',
+          'api::enrollment.enrollment.create',
+          'api::enrollment.enrollment.update',
+          'api::enrollment.enrollment.delete',
+        ],
+        'Content Manager': [
+          'api::auth.auth.me',
+          'api::course.course.find',
+          'api::course.course.findOne',
+          'api::course.course.create',
+          'api::course.course.update',
+          'api::course.course.delete',
+          'api::lesson.lesson.find',
+          'api::lesson.lesson.findOne',
+          'api::lesson.lesson.create',
+          'api::lesson.lesson.update',
+          'api::lesson.lesson.delete',
+          'api::quiz.quiz.find',
+          'api::quiz.quiz.findOne',
+          'api::quiz.quiz.create',
+          'api::quiz.quiz.update',
+          'api::quiz.quiz.delete',
+          'api::question.question.find',
+          'api::question.question.findOne',
+          'api::question.question.create',
+          'api::question.question.update',
+          'api::question.question.delete',
+          'api::quiz-result.quiz-result.find',
+          'api::quiz-result.quiz-result.findOne',
+          'api::lesson-progress.lesson-progress.find',
+          'api::lesson-progress.lesson-progress.findOne',
+          'api::blog-post.blog-post.find',
+          'api::blog-post.blog-post.findOne',
+          'api::blog-post.blog-post.create',
+          'api::blog-post.blog-post.update',
+          'api::blog-post.blog-post.delete',
+          'api::enrollment.enrollment.find',
+          'api::enrollment.enrollment.findOne',
+        ],
+        Instructor: [
+          'api::auth.auth.me',
+          'api::course.course.find',
+          'api::course.course.findOne',
+          'api::course.course.create',
+          'api::course.course.update',
+          'api::course.course.delete',
+          'api::lesson.lesson.find',
+          'api::lesson.lesson.findOne',
+          'api::lesson.lesson.create',
+          'api::lesson.lesson.update',
+          'api::lesson.lesson.delete',
+          'api::quiz.quiz.find',
+          'api::quiz.quiz.findOne',
+          'api::quiz.quiz.create',
+          'api::quiz.quiz.update',
+          'api::quiz.quiz.delete',
+          'api::question.question.find',
+          'api::question.question.findOne',
+          'api::question.question.create',
+          'api::question.question.update',
+          'api::question.question.delete',
+          'api::quiz-result.quiz-result.find',
+          'api::quiz-result.quiz-result.findOne',
+          'api::lesson-progress.lesson-progress.find',
+          'api::lesson-progress.lesson-progress.findOne',
+          'api::blog-post.blog-post.find',
+          'api::blog-post.blog-post.findOne',
+          'api::enrollment.enrollment.find',
+          'api::enrollment.enrollment.findOne',
+        ],
+        Student: [
+          'api::auth.auth.me',
+          'api::course.course.find',
+          'api::course.course.findOne',
+          'api::lesson.lesson.find',
+          'api::lesson.lesson.findOne',
+          'api::enrollment.enrollment.find',
+          'api::enrollment.enrollment.findOne',
+          'api::enrollment.enrollment.create',
+          'api::lesson-progress.lesson-progress.find',
+          'api::lesson-progress.lesson-progress.findOne',
+          'api::lesson-progress.lesson-progress.create',
+          'api::lesson-progress.lesson-progress.update',
+          'api::quiz.quiz.find',
+          'api::quiz.quiz.findOne',
+          'api::question.question.find',
+          'api::question.question.findOne',
+          'api::quiz-result.quiz-result.find',
+          'api::quiz-result.quiz-result.findOne',
+          'api::quiz-result.quiz-result.create',
+          'api::quiz-result.quiz-result.submit',
+          'api::blog-post.blog-post.find',
+          'api::blog-post.blog-post.findOne',
+        ],
+        Authenticated: [
+          'api::auth.auth.me',
+          'api::course.course.find',
+          'api::course.course.findOne',
+          'api::lesson.lesson.find',
+          'api::lesson.lesson.findOne',
+          'api::enrollment.enrollment.find',
+          'api::enrollment.enrollment.findOne',
+          'api::enrollment.enrollment.create',
+          'api::lesson-progress.lesson-progress.find',
+          'api::lesson-progress.lesson-progress.findOne',
+          'api::lesson-progress.lesson-progress.create',
+          'api::lesson-progress.lesson-progress.update',
+          'api::quiz.quiz.find',
+          'api::quiz.quiz.findOne',
+          'api::question.question.find',
+          'api::question.question.findOne',
+          'api::quiz-result.quiz-result.find',
+          'api::quiz-result.quiz-result.findOne',
+          'api::quiz-result.quiz-result.create',
+          'api::quiz-result.quiz-result.submit',
+          'api::blog-post.blog-post.find',
+          'api::blog-post.blog-post.findOne',
+        ],
+        Public: [
+          'api::auth.auth.register',
+          'api::auth.auth.login',
+          'api::course.course.find',
+          'api::course.course.findOne',
+          'api::lesson.lesson.find',
+          'api::lesson.lesson.findOne',
+          'api::blog-post.blog-post.find',
+          'api::blog-post.blog-post.findOne',
+        ],
+      };
 
       const roles = await strapi.db.query('plugin::users-permissions.role').findMany();
-      const authenticatedRole = roles.find((r: any) => r.type === 'authenticated' || r.name === 'Authenticated');
-      const studentRole = roles.find((r: any) => r.type === 'student' || r.name === 'Student');
 
-      const targetRoles = [authenticatedRole, studentRole].filter(Boolean);
+      for (const role of roles) {
+        const actions = permissionsConfig[role.name] || (role.type === 'authenticated' ? permissionsConfig.Authenticated : null) || (role.type === 'public' ? permissionsConfig.Public : null);
+        if (!actions) continue;
 
-      for (const role of targetRoles) {
         for (const action of actions) {
-          let permission = await strapi.db.query('plugin::users-permissions.permission').findOne({
+          const perm = await strapi.db.query('plugin::users-permissions.permission').findOne({
             where: { action, role: role.id },
           });
 
-          if (!permission) {
+          if (!perm) {
             await strapi.db.query('plugin::users-permissions.permission').create({
               data: {
                 action,
@@ -56,8 +198,7 @@ export default {
         }
       }
     } catch (error) {
-      console.error('Bootstrap permissions error:', error);
+      console.error('Bootstrap Permissions Error:', error);
     }
   },
 };
-
