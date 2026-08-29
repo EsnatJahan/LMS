@@ -176,6 +176,25 @@ export default {
         ],
       };
 
+      // Ensure custom roles exist
+      const requiredRoles = [
+        { name: 'Admin', type: 'admin', description: 'Platform Administrator' },
+        { name: 'Content Manager', type: 'content_manager', description: 'Content Editor' },
+        { name: 'Instructor', type: 'instructor', description: 'Course Instructor' },
+        { name: 'Student', type: 'student', description: 'Student Learner' },
+      ];
+
+      for (const r of requiredRoles) {
+        const existing = await strapi.db.query('plugin::users-permissions.role').findOne({
+          where: { name: r.name },
+        });
+        if (!existing) {
+          await strapi.db.query('plugin::users-permissions.role').create({
+            data: r,
+          });
+        }
+      }
+
       const roles = await strapi.db.query('plugin::users-permissions.role').findMany();
 
       for (const role of roles) {
@@ -196,6 +215,142 @@ export default {
             });
           }
         }
+      }
+
+      // Seed Demo Users if missing
+      const adminRole = roles.find((r: any) => r.name === 'Admin');
+      const instRole = roles.find((r: any) => r.name === 'Instructor');
+      const contentRole = roles.find((r: any) => r.name === 'Content Manager');
+      const studentRole = roles.find((r: any) => r.name === 'Student');
+
+      const demoUsers = [
+        { username: 'lmsadmin', email: 'lmsadmin@test.com', role: adminRole?.id },
+        { username: 'instructor', email: 'instructor@test.com', role: instRole?.id },
+        { username: 'contentmanager', email: 'content@test.com', role: contentRole?.id },
+        { username: 'student', email: 'student@test.com', role: studentRole?.id },
+      ];
+
+      for (const u of demoUsers) {
+        const existingUser = await strapi.db.query('plugin::users-permissions.user').findOne({
+          where: { email: u.email },
+        });
+        if (!existingUser && u.role) {
+          await strapi.entityService.create('plugin::users-permissions.user', {
+            data: {
+              username: u.username,
+              email: u.email,
+              password: 'password123',
+              confirmed: true,
+              blocked: false,
+              role: u.role,
+            },
+          });
+        }
+      }
+
+      // Seed Starter Courses if database has 0 courses
+      const existingCourses = await strapi.db.query('api::course.course').count();
+      if (existingCourses === 0) {
+        const instUser: any = await strapi.db.query('plugin::users-permissions.user').findOne({
+          where: { email: 'instructor@test.com' },
+        });
+
+        // 1. Course 1: JavaScript Fundamentals
+        const c1: any = await strapi.entityService.create('api::course.course', {
+          data: {
+            title: 'JavaScript Fundamentals & Modern ES6+',
+            description: 'Master variables, closures, promises, async/await, and DOM manipulation from scratch.',
+            instructor: instUser?.id,
+            publishedAt: new Date(),
+          },
+        });
+
+        await strapi.entityService.create('api::lesson.lesson', {
+          data: {
+            title: '01. Variables, Scope & Hoisting',
+            content: 'In this lesson, we explore let, const, var, block scoping, and lexical environments.',
+            videoUrl: 'https://www.youtube.com/watch?v=W6NZfCO5SIk',
+            order: 1,
+            course: c1.id,
+            publishedAt: new Date(),
+          },
+        });
+
+        await strapi.entityService.create('api::lesson.lesson', {
+          data: {
+            title: '02. Asynchronous JavaScript & Promises',
+            content: 'Learn how the JavaScript event loop works, microtasks vs macrotasks, and Promise chaining.',
+            videoUrl: 'https://www.youtube.com/watch?v=PoRJizFvM7s',
+            order: 2,
+            course: c1.id,
+            publishedAt: new Date(),
+          },
+        });
+
+        const q1: any = await strapi.entityService.create('api::quiz.quiz', {
+          data: {
+            title: 'JavaScript Core Assessment',
+            description: 'Test your understanding of modern JavaScript concepts.',
+            course: c1.id,
+            publishedAt: new Date(),
+          },
+        });
+
+        await strapi.entityService.create('api::question.question', {
+          data: {
+            title: 'Which keyword creates a block-scoped variable in modern JavaScript?',
+            option1: 'var',
+            option2: 'let',
+            option3: 'function',
+            option4: 'global',
+            correctAnswer: 'let',
+            quiz: q1.id,
+            publishedAt: new Date(),
+          },
+        });
+
+        await strapi.entityService.create('api::question.question', {
+          data: {
+            title: 'What does Promise.all() resolve to?',
+            option1: 'The first completed promise',
+            option2: 'An array of all resolved values',
+            option3: 'A boolean value',
+            option4: 'An error',
+            correctAnswer: 'An array of all resolved values',
+            quiz: q1.id,
+            publishedAt: new Date(),
+          },
+        });
+
+        // 2. Course 2: React & Next.js
+        const c2: any = await strapi.entityService.create('api::course.course', {
+          data: {
+            title: 'Fullstack Next.js & React Architecture',
+            description: 'Build high-performance web applications with React Server Components, App Router, and Tailwind CSS.',
+            instructor: instUser?.id,
+            publishedAt: new Date(),
+          },
+        });
+
+        await strapi.entityService.create('api::lesson.lesson', {
+          data: {
+            title: '01. React Server Components & App Router',
+            content: 'Understand the difference between Server Components and Client Components in Next.js.',
+            videoUrl: 'https://www.youtube.com/watch?v=843nec-IvW0',
+            order: 1,
+            course: c2.id,
+            publishedAt: new Date(),
+          },
+        });
+
+        // 3. Starter Blog
+        await strapi.entityService.create('api::blog-post.blog-post', {
+          data: {
+            title: 'Getting Started with Modern Fullstack Architecture in 2026',
+            content: 'Building production-ready applications with Next.js App Router and Headless CMS backends.',
+            publishedAt: new Date(),
+          },
+        });
       }
     } catch (error) {
       console.error('Bootstrap Permissions Error:', error);
