@@ -109,18 +109,15 @@ export default function CourseDetails() {
           const enrollData = await enrollRes.json();
           const enrolledList = enrollData?.data || [];
           
-          const isUserEnrolled = enrolledList.some((enr) => {
           const isUserEnrolled = isStaff || localEnrolled || enrolledList.some((enr) => {
             const u = enr.users_permissions_user;
             const c = enr.course;
-            if (!u || !c) return false;
             if (!c) return false;
             
             const matchUser =
               !u ||
               u.id === parsedUser.id ||
               u.documentId === parsedUser.documentId ||
-              u.username === parsedUser.username;
               u.username === parsedUser.username ||
               (u.email && parsedUser.email && u.email.toLowerCase() === parsedUser.email.toLowerCase());
 
@@ -129,7 +126,6 @@ export default function CourseDetails() {
               c.documentId === courseObj.documentId ||
               c.documentId === id ||
               String(c.id) === String(id) ||
-              c.title === courseObj.title;
               (c.title && courseObj.title && c.title.trim().toLowerCase() === courseObj.title.trim().toLowerCase());
 
             return matchUser && matchCourse;
