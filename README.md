@@ -30,7 +30,7 @@ For testing and video walkthrough evaluation, use any of the pre-configured cred
 
 | Role | Email / Identifier | Password | Key Permissions & Flows to Test |
 |---|---|---|---|
-| **👑 Admin** | `admin@test.com` (or `lmsadmin@test.com`) | `password123` | Platform Analytics, User Role Management (`/admin`), Full control over courses and blogs |
+| **👑 Admin** | `lmsadmin@test.com` | `password123` | Platform Analytics, User Role Management (`/admin`), Full control over courses and blogs |
 | **✍️ Content Manager** | `content@test.com` | `password123` | Platform-wide course & lesson editor, Blog draft & publish workflows (`/manage/blogs`), Content Overview Dashboard |
 | **👨‍🏫 Instructor** | `instructor@test.com` | `password123` | Create own courses, add video lessons & MCQ quizzes, view enrolled students' completion rate on Instructor Dashboard |
 | **🎓 Student** | `student@test.com` | `password123` | Browse catalog, enroll in courses, sequential video lessons, mark progress, take auto-graded quizzes |
